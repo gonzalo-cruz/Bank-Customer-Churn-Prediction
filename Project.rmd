@@ -1,0 +1,189 @@
+---
+title: "Bank Customer Churn"
+author: "Gonzalo Cruz Gómez"
+output: 
+  pdf_document: default
+editor_options: 
+  markdown:
+    wrap: 72
+---
+
+### Introducción
+
+El conjunto de datos contiene datos sobre los clientes de un banco.
+Estos datos han sido extraídos del repositorio Bank Customer Churn
+Dataset de Kaggle. Objetivo Descripcion datos Tipo de problema
+
+### Business understanding
+
+Planteamos preguntas sobre nuestros datos:
+
+-   ¿Influye el salario en si el cliente deja el banco?
+
+-   ¿Influye el tiempo que lleva el cliente en el banco en si este deja
+    este banco?
+
+-   ¿Influye la edad?
+
+### Data understanding
+
+Importamos las librerías
+
+```{r}
+library(ggplot2)
+library(readr)
+library(tidyr)
+library(dplyr)
+
+```
+
+Leemos los datos
+
+```{r}
+Data <- read_csv("Bank Customer Churn Prediction.csv")
+ntotal <- dim(Data)[1]
+ptotal <- dim(Data)[2]
+```
+
+Podemos ver que tenemos n = 10000 observaciones y 12 variables en el
+dataset
+
+Dividimos los datos en train-test-validate
+
+```{r}
+set.seed(123)
+
+# creamos los indices
+indices <- 1:ntotal
+ntrain <- ntotal *.6
+ntest <- ntotal* .2
+nval <- ntotal-(ntrain+ntest)
+indices.train <- sample(indices, ntrain, replace= FALSE)
+indices.test <- sample(indices[-indices.train], ntest, replace= FALSE)
+indices.val <- indices[-c(indices.train, indices.test)]
+
+# 60% para train, 20% para test y 20% para validate
+
+train <- Data[indices.train,]
+test <- Data[indices.test,]
+validate <- Data[indices.val,]
+```
+
+Veamos las variables:
+
+```{r}
+str(train)
+```
+
+Podemos observar que la mayoria de nuestras variables son continuas, a
+excepción de aquellas que son char como country y gender, que son
+variables categóricas, y active_member, churn (variable objetivo) y
+credit card, que se trata de variables binarias.
+
+### Exploratory Data Analysis
+
+```{r}
+summary(train)
+```
+
+Comprobamos si hay valores faltantes:
+
+```{r}
+sum(is.na(Data))
+```
+
+Vemos que no tenemos valores faltantes.
+
+Visualizamos nuestros datos para ver como son y como están distribuidos
+
+```{r}
+train_long <- train %>%
+  dplyr::select(tenure, estimated_salary, balance, credit_score) %>%  
+  tidyr::gather(key = "Variable", value = "Value")
+
+ggplot(train_long, aes(x = Value, fill = Variable)) +
+  geom_histogram(bins = 20, color = "black", alpha = 0.5, aes(y =..density..)) + 
+  geom_density(aes(y =..density.., color = Variable), linewidth = 0.5, alpha = 0.2) + 
+  facet_wrap(~ Variable, scales = "free") +
+  labs(title = "Continuous data with Density", x = "Value", y = "Density") +
+  scale_fill_manual(values = c("skyblue", "lightgreen", "lightcoral", "lightpink")) +
+  scale_color_manual(values = c("darkblue", "darkgreen", "darkred", "darkorchid")) + 
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+```{r}
+train_long <- train %>%
+  dplyr::select(products_number, active_member, churn) %>%  
+  tidyr::gather(key = "Variable", value = "Value")
+
+ggplot(train_long, aes(x = Value, fill = Variable)) +
+  geom_histogram(bins = 4, color = "black", alpha = 0.7) +
+  facet_wrap(~ Variable, scales = "free") +
+  labs(title = "Discrete data", x = "Value", y = "Frequency") +
+  scale_fill_manual(values = c("skyblue", "lightgreen", "lightcoral")) +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+Vamos a ver qué nos dice nuestra variable objetivo
+
+```{r}
+table(train$churn)
+```
+
+```{r}
+ggplot(data = train, aes(x = churn, fill = factor(churn))) + 
+  geom_bar(aes(y = (..count..)/sum(..count..))) +
+  scale_y_continuous(labels = scales::percent) +
+  theme(legend.position = "none") +
+  ylab("Relative Frequency") +
+  xlab("Churn") +
+  theme_minimal() +  
+  scale_fill_manual(values = c("skyblue", "tomato"), 
+                    labels = c("No", "Yes")) + 
+  labs(title = "Churn Distribution")
+```
+
+Podemos ver como la mayoría de los clientes no se van del banco pero hay
+un porcentaje significativo que si lo hace
+
+Vamos a intentar contestar las preguntas que nos hicimos al inicio:
+
+\- ¿Influye el salario en si el cliente deja el banco?
+
+```{r}
+ggplot(train, aes(x = factor(churn), y = estimated_salary, fill = factor(churn))) +
+  geom_boxplot() +
+  labs(title = "Salary vs. Churn", x = "Churn", y = "Estimated Salary") +
+  scale_x_discrete(labels = c("No", "Yes")) +
+  scale_fill_manual(values = c("skyblue", "tomato"), labels = c("No", "Yes")) +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5)) 
+
+```
+
+\- ¿Influye el tiempo que lleva el cliente en el banco en si este deja
+el banco?
+
+```{r}
+ggplot(train, aes(x = factor(churn), y = tenure, fill = factor(churn))) + 
+  geom_boxplot() +
+  labs(title = "Tenure vs. Churn", x = "Churn", y = "Tenure (years)") +
+  scale_x_discrete(labels = c("No", "Yes")) + 
+  scale_fill_manual(values = c("skyblue", "tomato"), labels = c("No", "Yes")) +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5))  
+```
+
+\- ¿Influye la edad?
+
+```{r}
+ggplot(train, aes(x = factor(churn), y = age, fill = factor(churn))) + 
+  geom_boxplot() +
+  labs(title = "Age vs. Churn", x = "Churn", y = "Age (years)") +
+  scale_x_discrete(labels = c("No", "Yes")) + 
+  scale_fill_manual(values = c("skyblue", "tomato"), labels = c("No", "Yes")) +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
+```
