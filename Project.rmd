@@ -66,6 +66,7 @@ indices.val <- indices[-c(indices.train, indices.test)]
 
 train <- Data[indices.train,]
 test <- Data[indices.test,]
+validate <- Data[indices.val,]test <- Data[indices.test,]
 validate <- Data[indices.val,]
 ```
 
@@ -96,6 +97,7 @@ Vemos que no tenemos valores faltantes.
 
 Visualizamos nuestros datos para ver como son y como están distribuidos
 
+***quitar tenure*** 
 ```{r}
 train_long <- train %>%
   dplyr::select(tenure, estimated_salary, balance, credit_score) %>%  
@@ -112,6 +114,12 @@ ggplot(train_long, aes(x = Value, fill = Variable)) +
   theme(legend.position = "none")
 ```
 
+
+```{r}
+table(train$balance) #igual deberíamos plantearnos binarizarla -> ganamos robustez, perdemos info
+```
+Tenemos muchos valores en 0 de balance
+Cambiar histograma a bar
 ```{r}
 train_long <- train %>%
   dplyr::select(products_number, active_member, churn) %>%  
@@ -131,7 +139,7 @@ Vamos a ver qué nos dice nuestra variable objetivo
 ```{r}
 table(train$churn)
 ```
-
+***ver relaciones entre variables tmb viendo scatter plots, si no vemos relacion tomar logs***
 ```{r}
 ggplot(data = train, aes(x = churn, fill = factor(churn))) + 
   geom_bar(aes(y = (..count..)/sum(..count..))) +
