@@ -81,6 +81,7 @@ Podemos observar que la mayoria de nuestras variables son continuas, a excepció
 ### Exploratory Data Analysis
 
 Veamos un resumen de algunos estadísticos de cada columna
+
 ```{r estadísticos resumen}
 summary(train)
 ```
@@ -140,9 +141,45 @@ plot_tenure_hist <- ggplot(train, aes(x = tenure)) +
 print(plot_tenure_hist)
 ```
 
-Vamos a ver qué nos dice nuestra variable objetivo
+Vamos a buscar si hay algún tipo de relación entre nuestras variables, para ello vamos a utilizar scatter plots:
 
-***ver relaciones entre variables tmb viendo scatter plots, si no vemos relacion tomar logs***
+\*\* preguntar en clase \*\*
+
+```{r}
+# Estimated salary vs Balance
+ggplot(train, aes(x = estimated_salary, y = balance)) +
+  geom_point() +
+  labs(x = "Estimated Salary", y = "Balance")
+
+# aplicando una transformación logaritmica
+# utilizamos log(1+p) para no perder precisión aunque p sea muy pequeño
+ggplot(train, aes(x = log1p(estimated_salary), y = log1p(balance))) +
+  geom_point() +
+  labs(x = "Log(Estimated Salary)", y = "Log(Balance)")
+
+# Balance vs Credit Score
+ggplot(train, aes(x = credit_score, y = balance)) +
+  geom_point() +
+  labs(x = "Credit Score", y = "Balance")
+
+# aplicando una transformación logaritmica
+ggplot(train, aes(x = credit_score, y = log1p(balance))) +
+  geom_point() +
+  labs(x = "Credit Score", y = "Log(Balance)")
+
+# Credit Score vs Estimated Salary
+ggplot(train, aes(x = estimated_salary, y = credit_score)) +
+  geom_point() +
+  labs(x = "Estimated Salary", y = "Credit Score")
+
+# aplicando una transformación logaritmica
+ggplot(train, aes(x = log1p(estimated_salary), y = credit_score)) +
+  geom_point() +
+  labs(x = "Log(Estimated Salary)", y = "Credit Score")
+
+```
+
+Vamos a ver qué nos dice nuestra variable objetivo
 
 ```{r visualización churn}
 ggplot(data = train, aes(x = churn, fill = factor(churn))) + 
@@ -191,21 +228,19 @@ ggplot(train, aes(x = factor(churn), y = estimated_salary, fill = factor(churn))
 
 ```
 
-Podemos ver como, a priori, el salario anual no influye en la decisión de abandonar el banco
-Vamos a comprobarlo con un contraste de hipótesis: 
+Podemos ver como, a priori, el salario anual no influye en la decisión de abandonar el banco Vamos a comprobarlo con un contraste de hipótesis:
 
 ```{r contraste churn-salario}
+
 wilcox_result <- wilcox.test(estimated_salary ~ churn, data = train)
 print(wilcox_result)
 p_value <- wilcox_result$p.value
 if (p_value < alpha) {
   print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
 } else {
-  print("No podemos rechazar la hipótesis nula. No existe ninguna diferencia significativa entre los grupos")
+  print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
-
-
 
 \- ¿Influye el tiempo que lleva el cliente en el banco en si este deja el banco?
 
@@ -222,6 +257,7 @@ ggplot(train, aes(x = factor(churn), y = tenure, fill = factor(churn))) +
 Vamos a ver si hay una diferencia significativa entre los dos grupos. Para ello vamos a plantear un contraste de hipótesis:
 
 Primero comprobamos si tenure sigue una distribución normal
+
 ```{r distribucion tenure}
 train$churn <- as.factor(train$churn)
 alpha <- 0.05
@@ -234,6 +270,7 @@ if(p_value<alpha){
   print("sigue una distribución normal")
 }
 ```
+
 No sigue una distribución normal. Utilizamos un test no paramétrico (en este caso el test de wilcoxon) para ver si existe una diferencia significativa entre los dos grupos
 
 ```{r contraste tenure-churn}
@@ -246,6 +283,7 @@ if (p_value < alpha) {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
+
 \- ¿Influye la edad?
 
 ```{r age vs churn}
@@ -268,6 +306,7 @@ if(p_value<alpha){
   print("sigue una distribución normal")
 }
 ```
+
 Vemos que age no sigue tampoco una distribución normal
 
 ```{r contraste age-churn}
