@@ -1,6 +1,6 @@
 ---
 title: "Bank Customer Churn"
-author: "Gonzalo Cruz Gómez, Samuel Martínez, Jorge Tordesillas García"
+author: "Gonzalo Cruz Gómez"
 output: 
   html_document:
     theme: flatly
@@ -132,7 +132,7 @@ Tenemos muchos valores en 0 de balance
 
 ```{r visualizacion tenure}
 plot_tenure_hist <- ggplot(train, aes(x = tenure)) +
-  geom_histogram(binwidth = 1, fill = "lightblue", color = "black") +  # Adjust binwidth as needed
+  geom_histogram(binwidth = 1, fill = "lightblue", color = "black") +  
   labs(title = "Distribution of Tenure",
        x = "Tenure",
        y = "Count") +
@@ -151,31 +151,49 @@ ggplot(train, aes(x = estimated_salary, y = balance)) +
   geom_point() +
   labs(x = "Estimated Salary", y = "Balance")
 
-# aplicando una transformación logaritmica
+# aplicamos una transformación logaritmica
 # utilizamos log(1+p) para no perder precisión aunque p sea muy pequeño
+
 ggplot(train, aes(x = log1p(estimated_salary), y = log1p(balance))) +
   geom_point() +
   labs(x = "Log(Estimated Salary)", y = "Log(Balance)")
+
+# aplicamos una raíz como transformacion
+ggplot(train, aes(x = sqrt(estimated_salary), y = sqrt(balance))) +
+  geom_point() +
+  labs(x = "Sqrt(Estimated Salary)", y = "Sqrt(Balance)")
 
 # Balance vs Credit Score
 ggplot(train, aes(x = credit_score, y = balance)) +
   geom_point() +
   labs(x = "Credit Score", y = "Balance")
 
-# aplicando una transformación logaritmica
+# aplicamos una transformación logaritmica
 ggplot(train, aes(x = credit_score, y = log1p(balance))) +
   geom_point() +
   labs(x = "Credit Score", y = "Log(Balance)")
+
+# aplicamos una raíz como transformacion
+ggplot(train, aes(x = sqrt(credit_score), y = sqrt(balance))) +
+  geom_point() +
+  labs(x = "Sqrt(Credit score)", y = "Sqrt(Balance)")
+
 
 # Credit Score vs Estimated Salary
 ggplot(train, aes(x = estimated_salary, y = credit_score)) +
   geom_point() +
   labs(x = "Estimated Salary", y = "Credit Score")
 
-# aplicando una transformación logaritmica
+# aplicamos una transformación logaritmica
 ggplot(train, aes(x = log1p(estimated_salary), y = credit_score)) +
   geom_point() +
   labs(x = "Log(Estimated Salary)", y = "Credit Score")
+
+# aplicamos una raíz como transformacion
+ggplot(train, aes(x = sqrt(estimated_salary), y = sqrt(credit_score))) +
+  geom_point() +
+  labs(x = "Sqrt(Estimated Salary)", y = "Sqrt(credit score)")
+
 
 ```
 
@@ -315,6 +333,38 @@ print(wilcox_result)
 p_value <- wilcox_result$p.value
 if (p_value < alpha) {
   print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
+} else {
+  print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
+}
+```
+
+- ¿Influye el balance?
+```{r balance vs churn}
+ggplot(train, aes(x = factor(churn), y = balance, fill = factor(churn))) + 
+  geom_boxplot() +
+  labs(title = "Balance vs. Churn", x = "Churn", y = "Balance") +
+  scale_x_discrete(labels = c("No", "Yes")) + 
+  scale_fill_manual(values = c("skyblue", "tomato"), labels = c("No", "Yes")) +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
+```
+```{r distribucion balance}
+train %>%
+  group_by(churn) %>%
+  summarize(p_value = shapiro.test(age)$p.value)
+if(p_value<alpha){
+  print("No sigue una distribución normal")
+}else{
+  print("sigue una distribución normal")
+}
+```
+
+```{r contraste balance-churn}
+wilcox_result <- wilcox.test(balance ~ churn, data = train)
+print(wilcox_result)
+p_value <- wilcox_result$p.value
+if (p_value < alpha) {
+  print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el balance de los clientes entre aquellos que abandonan el banco y aquellos que no")
 } else {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
