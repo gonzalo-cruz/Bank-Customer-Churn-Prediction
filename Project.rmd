@@ -32,7 +32,8 @@ library(ggplot2)
 library(readr)
 library(tidyr)
 library(dplyr)
-
+library(gridExtra)
+library(GGally)
 ```
 
 Leemos los datos
@@ -368,4 +369,45 @@ if (p_value < alpha) {
 } else {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
+```
+
+### Tecnica de reducción a la dimensión.
+```{r}
+set.seed(1234)
+
+data_cont <- Data[, c("credit_score", "age", "tenure", "balance", "products_number")]
+data_cont <- na.omit(data_cont)
+
+pca <- prcomp(data_cont, center = TRUE, scale. = TRUE)
+
+# Guardar nuevas varialbes
+data_pca <- as.data.frame(pca$x)
+colnames(data_pca) <- paste0("PC", 1:ncol(data_pca))  # Renombrar dinámicamente
+
+# Gráfico de datos originales (matriz de dispersión)
+p1 <- ggpairs(data_cont) + 
+  ggtitle("Datos originales (variables continuas)")
+
+# Gráfico de componentes principales
+p2 <- ggplot(data_pca, aes(x = PC1, y = PC2)) +
+  geom_point(color = "red", alpha = 0.6) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  coord_fixed() +
+  ggtitle("Datos transformados (PCA)")
+
+# Mostrar gráficos lado a lado
+# Mostrar gráficos de forma separada
+print(p1)  # Matriz de dispersión creada con ggpairs
+print(p2)  # Gráfico de componentes principales
+```
+
+```{r}
+# Resumen del PCA (sin sobrescribir el objeto original)
+pca_summary <- summary(pca)
+print(pca$sdev)
+print(pca$rotation)
+print(pca$center)
+print(pca$scale)
+print(pca_summary)
 ```
