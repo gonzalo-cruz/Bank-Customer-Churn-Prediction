@@ -1,6 +1,6 @@
 ---
 title: "Bank Customer Churn"
-author: "Gonzalo Cruz Gómez, Samuel Martínez, Jorge Tordesillas García"
+author: "Gonzalo Cruz Gómez, Samuel Martínez Lorente, Jorge Tordesillas García"
 output: 
   html_document:
     theme: flatly
