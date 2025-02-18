@@ -34,6 +34,7 @@ library(tidyr)
 library(dplyr)
 library(gridExtra)
 library(GGally)
+library(factoextra)
 ```
 
 Leemos los datos
@@ -411,3 +412,61 @@ print(pca$center)
 print(pca$scale)
 print(pca_summary)
 ```
+
+# Análisis no supervisado
+
+En primer lugar vamos a calcular la distancia Euclídea entre las observaciones de la base de datos. También mostraremos la matriz de distancias.
+```{r}
+
+# Hacemos un escalado de las variables continuas
+datos_escalados <- scale(data_cont)
+
+head(datos_escalados)
+
+distance <- get_dist(datos_escalados)
+
+fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+```
+
+Podemos aplicar el algoritmo de las k-medias con k = 2 
+
+```{r}
+k_medias <- kmeans(datos_escalados, centers = 2, nstart = 25)
+str(k_medias)
+```
+
+Si imprimimos los resultados vemos que la técnica de agrupaciones dio lugar a 2 conglomerados o medias para los dos grupos en las variables que haya. También obtenemos la asignación de conglomerados para cada observación.
+
+```{r}
+k_medias
+```
+
+Visualización de los clusters
+```{r}
+fviz_cluster(k_medias, data = datos_escalados)
+```
+
+Vamos a realizar los 3 métodos más populares para determinar el número óptimo de clústeres:
+
+MÉTODO DEL CODO
+
+```{r}
+set.seed(123)
+
+fviz_nbclust(datos_escalados, kmeans, method = "wss")
+```
+
+
+Parece en este caso que 10 es una buena elección para el número de clusters
+
+```{r}
+k10 <- kmeans(datos_escalados, centers = 10, nstart = 25)
+
+fviz_cluster(k10, data = datos_escalados)
+```
+
+
+
+
+
+
