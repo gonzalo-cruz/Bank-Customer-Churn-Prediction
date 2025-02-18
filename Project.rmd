@@ -285,6 +285,7 @@ train %>%
   group_by(churn) %>%
   summarize(p_value = shapiro.test(tenure)$p.value)
 if(p_value<alpha){
+  
   print("No sigue una distribución normal")
 }else{
   print("sigue una distribución normal")
@@ -297,6 +298,7 @@ No sigue una distribución normal. Utilizamos un test no paramétrico (en este c
 wilcox_result <- wilcox.test(tenure ~ churn, data = train)
 print(wilcox_result)
 p_value <- wilcox_result$p.value
+alpha <- 0.5
 if (p_value < alpha) {
   print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
 } else {
@@ -372,7 +374,8 @@ if (p_value < alpha) {
 }
 ```
 
-### Tecnica de reducción a la dimensión.
+### Tecnica de reducción a la dimensión (PCA).
+Con el siguiente código veremos cómo afecta el uso del PCA a nuestros datos.
 ```{r}
 set.seed(1234)
 
@@ -402,7 +405,7 @@ p2 <- ggplot(data_pca, aes(x = PC1, y = PC2)) +
 print(p1)  # Matriz de dispersión creada con ggpairs
 print(p2)  # Gráfico de componentes principales
 ```
-
+Ahora los resultados de aplicar el PCA usando el summary para ver el resumen:
 ```{r}
 # Resumen del PCA (sin sobrescribir el objeto original)
 pca_summary <- summary(pca)
@@ -412,7 +415,9 @@ print(pca$center)
 print(pca$scale)
 print(pca_summary)
 ```
-
+```{r}
+prcomp(Data$credit_score)
+```
 # Análisis no supervisado
 
 En primer lugar vamos a calcular la distancia Euclídea entre las observaciones de la base de datos. También mostraremos la matriz de distancias.
