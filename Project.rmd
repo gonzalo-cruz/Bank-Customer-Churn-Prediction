@@ -418,6 +418,56 @@ print(pca_summary)
 ```{r}
 prcomp(Data$credit_score)
 ```
+Sin usar ninguna función de R para reducir la dimensionalidad lo haremos de la siguiente manera:
+1er paso: Realizaremos la normal de nuestro conjunto de datos:
+```{r}
+set.seed(1234)
+
+data_cont <- Data[, c("credit_score", "age", "tenure", "balance", "products_number")]
+data_cont <- na.omit(data_cont)
+
+X_data <- as.matrix(data_cont)
+
+# Calculamos las medias de cada columna.
+medias_data <- colMeans(X_data)
+# Calculamos la desviación típica de cada columna.
+desv_data <- apply(X_data,2,sd)
+
+# Una vez tenemos los datos podemos normalizar nuestra variable.
+# Primero restamos la media y después dividimos por la norma.
+X_data <- sweep(X_data, 2, medias_data, "-")
+X_norm <- sweep(X_data, 2, desv_data, "/")
+```
+
+
+2º paso: Calculamos la matriz de covarianza.
+```{r}
+C <- cov(X_norm)
+print(C)
+```
+3er paso: Calculamos los autovalores y autovectores, usamos "eigen"
+```{r}
+# Descomponemos
+eig <- eigen(C, TRUE, only.values = FALSE, EISPACK = FALSE)
+
+# Accedemos a los autovalores y autovectores
+autovalores <- eig$values
+autovectores <- eig$vectors
+print(autovectores)
+print(autovalores)
+```
+4º paso: Proyectamos los datos normalizados en el espacio principal.
+
+```{r}
+Z <- X_norm %*% autovectores
+```
+
+5º paso: Reducimos la dimensionalidad.
+```{r}
+# Guardamos solo PC1 y PC2
+Z_red <- Z[,1:2]
+print(Z_red)
+```
 # Análisis no supervisado
 
 En primer lugar vamos a calcular la distancia Euclídea entre las observaciones de la base de datos. También mostraremos la matriz de distancias.
