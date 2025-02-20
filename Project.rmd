@@ -602,6 +602,12 @@ data_cont %>%
   group_by(Cluster) %>%
   summarise_all("mean")
 ```
+Podemos interpretar esta tabla de diferenciación de las medias de la siguiente manera:
+- Edad más alta en el clúster 2 (60.86 años) → Este grupo podría representar clientes mayores, tal vez personas cercanas a la jubilación.
+- Balance muy bajo en el clúster 3 (3134.47) → Podría tratarse de clientes con cuentas nuevas o de bajo poder adquisitivo.
+- Balance alto en clúster 1 y 4 (~121k-124k) → Probablemente clientes con mayor poder adquisitivo o que mantienen altos saldos en sus cuentas.
+- Credit score más bajo en clúster 5 (640.05) → Este grupo podría representar clientes con menor solvencia o más riesgo crediticio.
+- Tenure más alto en clúster 5 (7.59 años) → Clientes que han estado más tiempo con la entidad financiera, pero con saldo bajo.
 
 
 ```{r}
