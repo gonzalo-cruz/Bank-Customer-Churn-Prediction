@@ -254,7 +254,7 @@ ggplot(train, aes(x = factor(churn), y = estimated_salary, fill = factor(churn))
 Podemos ver como, a priori, el salario anual no influye en la decisión de abandonar el banco Vamos a comprobarlo con un contraste de hipótesis:
 
 ```{r contraste churn-salario}
-alpha <-  0.05
+
 wilcox_result <- wilcox.test(estimated_salary ~ churn, data = train)
 print(wilcox_result)
 p_value <- wilcox_result$p.value
@@ -471,13 +471,20 @@ Z <- X_norm %*% autovectores
 Z_red <- Z[,1:2]
 print(Z_red)
 ```
+
+
 # Análisis no supervisado
 
 En primer lugar vamos a calcular la distancia Euclídea entre las observaciones de la base de datos. También mostraremos la matriz de distancias.
-```{r}
 
+```{r}
 # Hacemos un escalado de las variables continuas
 datos_escalados <- scale(data_cont)
+```
+
+
+```{r}
+#esto no va nose porque
 
 head(datos_escalados)
 
@@ -523,7 +530,6 @@ k10 <- kmeans(datos_escalados, centers = 10, nstart = 25)
 fviz_cluster(k10, data = datos_escalados)
 ```
 
-
 MÉTODO DE LA SILUETA
 
 ```{r}
@@ -532,65 +538,82 @@ fviz_nbclust(datos_escalados, kmeans, method = "silhouette")
 
 ```
 
-Con esta técnica, en nuestros datos, parece ser que la mejor elección es k igual a 2.
 
+Con esta técnica, en nuestros datos, parece que la mejor elección es k igual a 2.
 ```{r}
+sil <-  silhouette(k_medias$cluster, dist(datos_escalados))
 
-sil =  silhouette(k_medias$cluster, dist(datos_escalados))
 fviz_silhouette(sil)
-
 ```
 
-Un valor positivo significa que laobservación está bien agrupada, cuanto más se acerque el coeficiente a 1, mejor agrupada está la observación. En cambio un valor negativo significa que la observcaión está mal agrupada. Si una observación es igual a 0 significa que está entre dos conglomerados.
+La interpretación del coeficiente de la silueta la entendemos como que un valor positivo significa que la obervación está bien agrupada. Cuanto más se acerque al coeficiente a 1, mejor agrupada estará la observacíon. En cambio, un valor negativo significa que la obervación  está mal agrupada. Finalmente, un valor igual a 0 significa que la observación se encuentra entre dos conglomerados.
 
+El gráfico anterior y el coeficiente de silueta medio ayudan a determinar si la agrupación es buena o no.
 
 MÉTODO GAP
 
+El psroceso es el siguiente: se aplica el algoritmo de clustering a los datos con diferentes valores de k, se generan conjuntos de datos de referencia aleatorios, se calcula el estadístico Gap para cada valor de k y la selección del número óptimo de clusters.
+
 ```{r}
+set.seed(123)
 
 gap <-  clusGap(datos_escalados, FUN = kmeans, nstart = 25, K.max = 10, B = 50)
 
-print(gap, method = "firstmax")
+print(gap_stat, method = "firstmax")
 ```
-En este método hace lo siguiente: se aplica el algoritmo de clustering a los datos con diferentes valores de k. Se generan conjuntos de datos de referencia aleatorios. Se calcula el estadístico de Gap para cada valor de k. Se selecciona el número óptimo de clusters(el valor de k que maximiza el estadístico se considera el número óptimo de clusters).
+
+
 
 ```{r}
 fviz_gap_stat(gap)
 ```
 
-
-
-Parece que el número óptimo de clusters es k = 6.
+Parece ser que el número óptimo de clusters es 6.
 
 ```{r}
-
-k6 = kmeans(datos_escalados, centers = 6, nstart = 25)
+k6 <-  kmeans(datos_escalados, centers = 6, nstart = 25)
 
 fviz_cluster(k6, data = datos_escalados)
-
 ```
 
 
+Esquema de agrupación a partir de los diferentes resultados obtenidos variando todas las combinaciones de clústeres, medias de diatancia y métodos de agrupación
 
 ```{r}
-
 nb <-  NbClust(datos_escalados, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
-
 ```
 
 
 ```{r}
-n_clust <- n_clusters(as.data.frame(datos_escalados),
-                                    package = c("easystarts", "NbClust", "mclust"),
-                                    estandarized = FALSE)
-
+n_clust <-  n_clusters(as.data.frame(datos_escalados), 
+                       package = c("easystarts", "NbClust", "mclust"),
+                       standardize = FALSE)
 n_clust
 ```
-
 
 ```{r}
 plot(n_clust)
 ```
+
+
+```{r}
+data_cont %>%
+  mutate(Cluster = k6$cluster) %>%
+  group_by(Cluster) %>%
+  summarise_all("mean")
+```
+
+
+```{r}
+res_kmeans <-  cluster_analysis(datos_escalados, 
+                                n = 6,
+                                method = "kmeans")
+
+plot(summary(res_kmeans))
+```
+
+
+
 
 
 
