@@ -35,6 +35,9 @@ library(dplyr)
 library(gridExtra)
 library(GGally)
 library(factoextra)
+library(cluster)
+library("NbClust")
+library(parameters)
 ```
 
 Leemos los datos
@@ -251,7 +254,7 @@ ggplot(train, aes(x = factor(churn), y = estimated_salary, fill = factor(churn))
 Podemos ver como, a priori, el salario anual no influye en la decisión de abandonar el banco Vamos a comprobarlo con un contraste de hipótesis:
 
 ```{r contraste churn-salario}
-
+alpha <-  0.05
 wilcox_result <- wilcox.test(estimated_salary ~ churn, data = train)
 print(wilcox_result)
 p_value <- wilcox_result$p.value
@@ -518,6 +521,75 @@ Parece en este caso que 10 es una buena elección para el número de clusters
 k10 <- kmeans(datos_escalados, centers = 10, nstart = 25)
 
 fviz_cluster(k10, data = datos_escalados)
+```
+
+
+MÉTODO DE LA SILUETA
+
+```{r}
+
+fviz_nbclust(datos_escalados, kmeans, method = "silhouette")
+
+```
+
+Con esta técnica, en nuestros datos, parece ser que la mejor elección es k igual a 2.
+
+```{r}
+
+sil =  silhouette(k_medias$cluster, dist(datos_escalados))
+fviz_silhouette(sil)
+
+```
+
+Un valor positivo significa que laobservación está bien agrupada, cuanto más se acerque el coeficiente a 1, mejor agrupada está la observación. En cambio un valor negativo significa que la observcaión está mal agrupada. Si una observación es igual a 0 significa que está entre dos conglomerados.
+
+
+MÉTODO GAP
+
+```{r}
+
+gap <-  clusGap(datos_escalados, FUN = kmeans, nstart = 25, K.max = 10, B = 50)
+
+print(gap, method = "firstmax")
+```
+En este método hace lo siguiente: se aplica el algoritmo de clustering a los datos con diferentes valores de k. Se generan conjuntos de datos de referencia aleatorios. Se calcula el estadístico de Gap para cada valor de k. Se selecciona el número óptimo de clusters(el valor de k que maximiza el estadístico se considera el número óptimo de clusters).
+
+```{r}
+fviz_gap_stat(gap)
+```
+
+
+
+Parece que el número óptimo de clusters es k = 6.
+
+```{r}
+
+k6 = kmeans(datos_escalados, centers = 6, nstart = 25)
+
+fviz_cluster(k6, data = datos_escalados)
+
+```
+
+
+
+```{r}
+
+nb <-  NbClust(datos_escalados, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
+
+```
+
+
+```{r}
+n_clust <- n_clusters(as.data.frame(datos_escalados),
+                                    package = c("easystarts", "NbClust", "mclust"),
+                                    estandarized = FALSE)
+
+n_clust
+```
+
+
+```{r}
+plot(n_clust)
 ```
 
 
