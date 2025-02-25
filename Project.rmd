@@ -257,6 +257,7 @@ Podemos ver como, a priori, el salario anual no influye en la decisión de aband
 
 wilcox_result <- wilcox.test(estimated_salary ~ churn, data = train)
 print(wilcox_result)
+alpha <-  0.05
 p_value <- wilcox_result$p.value
 if (p_value < alpha) {
   print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
@@ -482,11 +483,13 @@ En primer lugar vamos a calcular la distancia Euclídea entre las observaciones 
 datos_escalados <- scale(data_cont)
 ```
 
+```{r}
+head(datos_escalados)
+```
 
+Matriz de distancias
 ```{r}
 #esto no va nose porque
-
-head(datos_escalados)
 
 distance <- get_dist(datos_escalados)
 
@@ -503,7 +506,15 @@ str(k_medias)
 Si imprimimos los resultados vemos que la técnica de agrupaciones dio lugar a 2 conglomerados o medias para los dos grupos en las variables que haya. También obtenemos la asignación de conglomerados para cada observación.
 
 ```{r}
+set.seed(595)
 k_medias
+k_medias$cluster
+k_medias$totss
+k_medias$betweenss
+k_medias$withinss
+k_medias$tot.withinss
+k_medias$size
+
 ```
 
 Visualización de los clusters
@@ -528,7 +539,18 @@ Parece en este caso que 10 es una buena elección para el número de clusters
 k10 <- kmeans(datos_escalados, centers = 10, nstart = 25)
 
 fviz_cluster(k10, data = datos_escalados)
+k10
+
 ```
+
+```{r}
+set.seed(595)
+table(k_medias$cluster, k10$cluster)
+
+datos_escalados$labels = k10$cluster
+```
+
+
 
 MÉTODO DE LA SILUETA
 
@@ -571,7 +593,7 @@ fviz_gap_stat(gap)
 Parece ser que el número óptimo de clusters es 6.
 
 ```{r}
-k6 <-  kmeans(datos_escalados, centers = 6, nstart = 25)
+k6 <-  kmeans(datos_escalados, centers = 6, iter.max = 10, nstart = 25)
 
 fviz_cluster(k6, data = datos_escalados)
 ```
@@ -598,16 +620,16 @@ plot(n_clust)
 
 ```{r}
 data_cont %>%
-  mutate(Cluster = k6$cluster) %>%
-  group_by(Cluster) %>%
+  mutate(clusters = k6$cluster) %>%
+  group_by(clusters) %>%
   summarise_all("mean")
 ```
 Podemos interpretar esta tabla de diferenciación de las medias de la siguiente manera:
-- Edad más alta en el clúster 2 (60.86 años) → Este grupo podría representar clientes mayores, tal vez personas cercanas a la jubilación.
-- Balance muy bajo en el clúster 3 (3134.47) → Podría tratarse de clientes con cuentas nuevas o de bajo poder adquisitivo.
-- Balance alto en clúster 1 y 4 (~121k-124k) → Probablemente clientes con mayor poder adquisitivo o que mantienen altos saldos en sus cuentas.
-- Credit score más bajo en clúster 5 (640.05) → Este grupo podría representar clientes con menor solvencia o más riesgo crediticio.
-- Tenure más alto en clúster 5 (7.59 años) → Clientes que han estado más tiempo con la entidad financiera, pero con saldo bajo.
+- Edad más alta en el clúster 2 (60.86 años): Este grupo podría representar clientes mayores, tal vez personas cercanas a la jubilación.
+- Balance muy bajo en el clúster 3 (3134.47): Podría tratarse de clientes con cuentas nuevas o de bajo poder adquisitivo.
+- Balance alto en clúster 1 y 4 (121k-124k): Probablemente clientes con mayor poder adquisitivo o que mantienen altos saldos en sus cuentas.
+- Credit score más bajo en clúster 5 (640.05): Este grupo podría representar clientes con menor solvencia o más riesgo crediticio.
+- Tenure más alto en clúster 5 (7.59 años): Clientes que han estado más tiempo con la entidad financiera, pero con saldo bajo.
 
 
 ```{r}
