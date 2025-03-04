@@ -491,9 +491,9 @@ Matriz de distancias
 ```{r}
 #esto no va nose porque
 
-distance <- get_dist(datos_escalados)
+#distance <- get_dist(datos_escalados)
 
-fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+#fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
 ```
 
 Podemos aplicar el algoritmo de las k-medias con k = 2 
@@ -533,21 +533,22 @@ fviz_nbclust(datos_escalados, kmeans, method = "wss")
 ```
 
 
-Parece en este caso que 10 es una buena elección para el número de clusters
+En este análisis, a partir de 4 clusters, la reducción en la suma total de cuadrados internos parece estabilizarse, indicando que k = 4 es una buena opción. 
 
 ```{r}
-k10 <- kmeans(datos_escalados, centers = 10, nstart = 25)
+k4 <- kmeans(datos_escalados, centers = 4, nstart = 25)
 
-fviz_cluster(k10, data = datos_escalados)
-k10
+fviz_cluster(k4, data = datos_escalados)
+k4
 
 ```
 
+
+
 ```{r}
 set.seed(595)
-table(k_medias$cluster, k10$cluster)
+table(k_medias$cluster, k4$cluster)
 
-datos_escalados$labels = k10$cluster
 ```
 
 
@@ -574,14 +575,14 @@ El gráfico anterior y el coeficiente de silueta medio ayudan a determinar si la
 
 MÉTODO GAP
 
-El psroceso es el siguiente: se aplica el algoritmo de clustering a los datos con diferentes valores de k, se generan conjuntos de datos de referencia aleatorios, se calcula el estadístico Gap para cada valor de k y la selección del número óptimo de clusters.
+El proceso es el siguiente: se aplica el algoritmo de clustering a los datos con diferentes valores de k, se generan conjuntos de datos de referencia aleatorios, se calcula el estadístico Gap para cada valor de k y la selección del número óptimo de clusters.
 
 ```{r}
 set.seed(123)
 
 gap <-  clusGap(datos_escalados, FUN = kmeans, nstart = 25, K.max = 10, B = 50)
 
-print(gap_stat, method = "firstmax")
+print(gap, method = "firstmax")
 ```
 
 
@@ -602,7 +603,7 @@ fviz_cluster(k6, data = datos_escalados)
 Esquema de agrupación a partir de los diferentes resultados obtenidos variando todas las combinaciones de clústeres, medias de diatancia y métodos de agrupación
 
 ```{r}
-nb <-  NbClust(datos_escalados, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
+# nb <-  NbClust(datos_escalados, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
 ```
 
 
@@ -639,6 +640,49 @@ res_kmeans <-  cluster_analysis(datos_escalados,
 
 plot(summary(res_kmeans))
 ```
+
+
+```{r}
+set.seed(4321)
+pam_clusters <- pam(x = datos_escalados, k = 6, metric = "manhattan")
+pam_clusters
+
+fviz_cluster(object = pam_cluster, data = datos_escalados, ellipse = "t", 
+             repel = TRUE) +
+  theme_bw() +
+  labs(title = " Resultados clustering PAM") + theme(legend.position = "none")
+```
+
+Una de las limitaciones del método de clusters es que se requiere mucha memoria RAM, por lo que cuando el set de datos contiene muchas observaciones es imposible, igual que nuestro dataset.
+
+Entonces vamos a simular un set de datos bidimensional con 500 observaciones, de las cuales 200 pertenecen a un grupo y 300 a otro.
+
+```{r}
+set.seed(1234)
+grupo_1 <- cbind(rnorm(n = 200, mean = 0, sd = 8),
+                 rnorm(n = 200, mean = 0, sd = 8))
+grupo_2 <- cbind(rnorm(n = 300, mean = 30, sd = 8),
+                 rnorm(n = 300, mean = 30, sd = 8))
+datos <- rbind(grupo_1, grupo_2)
+colnames(datos) <- c("x", "y")
+head(datos)
+```
+
+```{r}
+clara_clusters <- clara(x = datos_escalados, k = 2, metric = "manhattan", stand = TRUE,
+                        samples = 50, pamLike = TRUE)
+clara_clusters
+```
+
+
+```{r}
+fviz_cluster(object = clara_clusters, ellipse.type = "t", geom = "point",
+             pointsize = 2.5) +
+  theme_bw() +
+  labs(title = "Resultados clustering CLARA") +
+  theme(legend.position = "none")
+```
+
 
 
 
