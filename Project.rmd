@@ -11,7 +11,30 @@ output:
 
 ### Introducción
 
-El conjunto de datos contiene datos sobre los clientes de un banco. Estos datos han sido extraídos del repositorio Bank Customer Churn Dataset de Kaggle. Objetivo Descripcion datos Tipo de problema
+Objetivo:
+
+El objetivo principal de este conjunto de datos es predecir la fuga de clientes (churn). En otras palabras, queremos construir un modelo que pueda determinar qué clientes tienen más probabilidades de dejar el banco en el futuro. Esto es importante para los bancos, ya que retener a los clientes existentes es normalemente más rentable que conseguir clientes nuevos.
+
+Descripción de Datos (Variables):
+
+```         
+CustomerId: Identificador único para cada cliente. (Tipo: Numérico)
+CreditScore: Puntaje de crédito del cliente. (Tipo: Numérico)
+Country: País donde reside el cliente (por ejemplo, Francia, España, Alemania). (Tipo: Categórico)
+Gender: Género del cliente (Masculino o Femenino). (Tipo: Categórico)
+Age: Edad del cliente. (Tipo: Numérico)
+Tenure: Número de años que el cliente ha sido cliente del banco. (Tipo: Numérico)
+Balance: Saldo en la cuenta bancaria del cliente. (Tipo: Numérico)
+Products_number: Número de productos bancarios que el cliente utiliza. (Tipo: Numérico)
+Card: Indica si el cliente tiene tarjeta de crédito (1 = Sí, 0 = No). (Tipo: Binario)
+Active_member: Indica si el cliente es un miembro activo (1 = Sí, 0 = No). (Tipo: Binario)
+EstimatedSalary: Salario estimado del cliente. (Tipo: Numérico)
+Churn: Variable objetivo. Indica si el cliente dejó el banco (1 = Sí, 0 = No). (Tipo: Binario)
+```
+
+Tipo de Problema:
+
+Este es un problema de clasificación binaria. El objetivo es clasificar a los clientes en dos categorías: aquellos que se irán (1) y aquellos que se quedarán (0).
 
 ### Business understanding
 
@@ -22,6 +45,10 @@ Planteamos preguntas sobre nuestros datos:
 -   ¿Influye el tiempo que lleva el cliente en el banco en si este deja este banco?
 
 -   ¿Influye la edad?
+
+-   ¿Influye el género?
+
+-   ¿Influye el país?
 
 ### Data understanding
 
@@ -81,11 +108,18 @@ Veamos las variables:
 str(train)
 ```
 
-Podemos observar que la mayoria de nuestras variables son continuas, a excepción de aquellas que son char como country y gender, que son variables categóricas, y active_member, churn (variable objetivo) y credit card, que se trata de variables binarias.
+Podemos observar que la mayoria de nuestras variables son numéricas, a excepción de aquellas que son char como country y gender, que son variables categóricas. En el caso de credit card, active_member, products number, tenure y churn se trata de variables discretas.
+
+Antes de nada vamos a transformar nuestras variables categóricas de char a factor.
+
+```{r}
+train$country <- as.factor(train$country)
+train$gender <- as.factor(train$gender)
+```
 
 ### Exploratory Data Analysis
 
-Veamos un resumen de algunos estadísticos de cada columna
+Veamos un resumen de algunos de los estadísticos principales de cada columna
 
 ```{r estadísticos resumen}
 summary(train)
@@ -117,7 +151,7 @@ ggplot(train_long, aes(x = Value, fill = Variable)) +
   theme(legend.position = "none")
 ```
 
-Tenemos muchos valores en 0 de balance
+Nuestras variables balance y credit score siguen distribuciones bastante similares a la normal (exceptuando el gran número de ceros en balance), mientras que el salario estimado sigue una distribución más uniforme.
 
 ```{r vsualizacion variables discretas}
   train_long <- train %>%
@@ -135,6 +169,8 @@ Tenemos muchos valores en 0 de balance
   print(combined_plot)
 ```
 
+Podemos ver como hay más gente que se queda en el banco respecto a la que se va, el numero de miembros activos y pasados es basicamente igual y que el número de productos más habitual es o 0 o 1, con muy pocos clientes teniendo más de 2.
+
 ```{r visualizacion tenure}
 plot_tenure_hist <- ggplot(train, aes(x = tenure)) +
   geom_histogram(binwidth = 1, fill = "lightblue", color = "black") +  
@@ -146,9 +182,31 @@ plot_tenure_hist <- ggplot(train, aes(x = tenure)) +
 print(plot_tenure_hist)
 ```
 
-Vamos a buscar si hay algún tipo de relación entre nuestras variables, para ello vamos a utilizar scatter plots:
+Ahora miramos las variables categóricas
 
-\*\* preguntar en clase \*\*
+```{r}
+# Gráfico de barras para 'Gender'
+ggplot(train, aes(x = gender)) +
+  geom_bar(fill = c("skyblue", "salmon")) +
+  labs(title = "Distribución de Género",
+       x = "Género",
+       y = "Número de Clientes") +
+  theme_minimal()
+
+# Gráfico de barras para 'Geography'
+ggplot(train, aes(x = country)) +
+  geom_bar(fill = c("lightgreen", "lightcoral", "lightblue")) +
+  labs(title = "Distribución por Países",
+       x = "País",
+       y = "Número de Clientes") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotar etiquetas
+
+```
+
+Podemos ver que hay más clientes hombres que mujeres, aunque la diferencia no es grande, y también podemos observar que la mayor parte de los clientes del banco son franceses, con un número similar de clientes de este país a la combinación de España y Alemania.
+
+Vamos a buscar si hay algún tipo de relación entre nuestras variables, para ello vamos a utilizar scatter plots:
 
 ```{r}
 # Estimated salary vs Balance
@@ -156,51 +214,20 @@ ggplot(train, aes(x = estimated_salary, y = balance)) +
   geom_point() +
   labs(x = "Estimated Salary", y = "Balance")
 
-# aplicamos una transformación logaritmica
-# utilizamos log(1+p) para no perder precisión aunque p sea muy pequeño
-
-ggplot(train, aes(x = log1p(estimated_salary), y = log1p(balance))) +
-  geom_point() +
-  labs(x = "Log(Estimated Salary)", y = "Log(Balance)")
-
-# aplicamos una raíz como transformacion
-ggplot(train, aes(x = sqrt(estimated_salary), y = sqrt(balance))) +
-  geom_point() +
-  labs(x = "Sqrt(Estimated Salary)", y = "Sqrt(Balance)")
-
 # Balance vs Credit Score
 ggplot(train, aes(x = credit_score, y = balance)) +
   geom_point() +
   labs(x = "Credit Score", y = "Balance")
-
-# aplicamos una transformación logaritmica
-ggplot(train, aes(x = credit_score, y = log1p(balance))) +
-  geom_point() +
-  labs(x = "Credit Score", y = "Log(Balance)")
-
-# aplicamos una raíz como transformacion
-ggplot(train, aes(x = sqrt(credit_score), y = sqrt(balance))) +
-  geom_point() +
-  labs(x = "Sqrt(Credit score)", y = "Sqrt(Balance)")
-
 
 # Credit Score vs Estimated Salary
 ggplot(train, aes(x = estimated_salary, y = credit_score)) +
   geom_point() +
   labs(x = "Estimated Salary", y = "Credit Score")
 
-# aplicamos una transformación logaritmica
-ggplot(train, aes(x = log1p(estimated_salary), y = credit_score)) +
-  geom_point() +
-  labs(x = "Log(Estimated Salary)", y = "Credit Score")
-
-# aplicamos una raíz como transformacion
-ggplot(train, aes(x = sqrt(estimated_salary), y = sqrt(credit_score))) +
-  geom_point() +
-  labs(x = "Sqrt(Estimated Salary)", y = "Sqrt(credit score)")
-
 
 ```
+
+Podemos ver como siguen distribuciones bastante normales, con la excepción de los datos con valor 0 del balance, que como hay muchos, tienen mucho peso.
 
 Vamos a ver qué nos dice nuestra variable objetivo
 
@@ -219,7 +246,7 @@ ggplot(data = train, aes(x = churn, fill = factor(churn))) +
 
 Podemos ver como la mayoría de los clientes no se van del banco pero hay un porcentaje significativo que si lo hace
 
-Ahora veamos como estan distribuidos por género:
+Ahora veamos como estan distribuidos por género y país:
 
 ```{r churn vs genero}
 train$churn <- factor(train$churn, levels = c(0, 1), labels = c("No", "Yes"))
@@ -233,8 +260,22 @@ train %>%
   theme_bw() +
   scale_fill_manual(values = c("skyblue", "tomato"), name = "Churn Status")
 
-
 ```
+
+Aquí se observa que el porcentaje de hombres que no se marchan del banco es mayor que el de las mujeres
+
+```{r}
+train %>%
+  count(country, churn) %>%
+  mutate(Percentage = n / sum(n) * 100) %>%
+  ggplot(aes(x = country, y = Percentage, fill = churn)) +
+  geom_col(position = "dodge") +
+  labs(title = "Churn by country", x = "country", y = "Percentage") +
+  theme_bw() +
+  scale_fill_manual(values = c("skyblue", "tomato"), name = "Churn Status")
+```
+
+Vemos como los clientes franceses y los españoles son mucho menos propensos que los alemanes a marcharse del banco
 
 Vamos a intentar contestar las preguntas que nos hicimos al inicio:
 
@@ -253,6 +294,22 @@ ggplot(train, aes(x = factor(churn), y = estimated_salary, fill = factor(churn))
 
 Podemos ver como, a priori, el salario anual no influye en la decisión de abandonar el banco Vamos a comprobarlo con un contraste de hipótesis:
 
+```{r distribucion salary}
+train$churn <- as.factor(train$churn)
+alpha <- 0.05
+train %>%
+  group_by(churn) %>%
+  summarize(p_value = shapiro.test(estimated_salary)$p.value)
+if(p_value<alpha){
+  
+  print("No sigue una distribución normal")
+}else{
+  print("sigue una distribución normal")
+}
+```
+
+Como no sigue una distribución normal debemos utilizar un test no paramétrico coomo el de wilcoxon para comprobar si existe una diferencia significativa.
+
 ```{r contraste churn-salario}
 
 wilcox_result <- wilcox.test(estimated_salary ~ churn, data = train)
@@ -265,6 +322,8 @@ if (p_value < alpha) {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
+
+Como ya podíamos intuir por la gráfica no hay una diferencia significativa respecto al salario
 
 \- ¿Influye el tiempo que lleva el cliente en el banco en si este deja el banco?
 
@@ -296,19 +355,23 @@ if(p_value<alpha){
 }
 ```
 
-No sigue una distribución normal. Utilizamos un test no paramétrico (en este caso el test de wilcoxon) para ver si existe una diferencia significativa entre los dos grupos
+Sigue una distribución normal. Utilizamos un test t para comprobar si existe alguna diferencia significativa.
 
 ```{r contraste tenure-churn}
-wilcox_result <- wilcox.test(tenure ~ churn, data = train)
-print(wilcox_result)
-p_value <- wilcox_result$p.value
+t_test_result <- t.test(tenure ~ churn, data = train)
+print(t_test_result)
+
+p_value <- t_test_result$p.value
 alpha <- 0.5
-if (p_value < alpha) {
+
+if (p_value < alpha){
   print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
 } else {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
+
+Por tanto podemos decir que el hecho de abandonar o no el banco sí depende del tiempo que llevan los clientes en el mismo.
 
 \- ¿Influye la edad?
 
@@ -326,14 +389,9 @@ ggplot(train, aes(x = factor(churn), y = age, fill = factor(churn))) +
 train %>%
   group_by(churn) %>%
   summarize(p_value = shapiro.test(age)$p.value)
-if(p_value<alpha){
-  print("No sigue una distribución normal")
-}else{
-  print("sigue una distribución normal")
-}
 ```
 
-Vemos que age no sigue tampoco una distribución normal
+Vemos que age no sigue una distribución normal, por lo que aplico un test de wilcoxon
 
 ```{r contraste age-churn}
 wilcox_result <- wilcox.test(age ~ churn, data = train)
@@ -345,8 +403,10 @@ if (p_value < alpha) {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
+Podemos ver como la edad importa a la hora de que un cliente abandone el banco o no, usualmente siendo los clientes mayores los que tienden a abandonar el banco
 
-- ¿Influye el balance?
+-   ¿Influye el balance?
+
 ```{r balance vs churn}
 ggplot(train, aes(x = factor(churn), y = balance, fill = factor(churn))) + 
   geom_boxplot() +
@@ -356,8 +416,9 @@ ggplot(train, aes(x = factor(churn), y = balance, fill = factor(churn))) +
   theme_bw() +
   theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
 ```
+
 ```{r distribucion balance}
-train %>%
+Strain %>%
   group_by(churn) %>%
   summarize(p_value = shapiro.test(age)$p.value)
 if(p_value<alpha){
@@ -377,13 +438,16 @@ if (p_value < alpha) {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
+Se observa que cuanto mayor es el balance, mayor es la probabilidad de que el cliente se cambie de banco
 
 ### Tecnica de reducción a la dimensión (PCA).
+
 Con el siguiente código veremos cómo afecta el uso del PCA a nuestros datos.
+
 ```{r}
 set.seed(1234)
 
-data_cont <- Data[, c("credit_score", "age", "tenure", "balance", "products_number")]
+data_cont <- train[, c("credit_score", "age", "tenure", "balance", "products_number")]
 data_cont <- na.omit(data_cont)
 
 pca <- prcomp(data_cont, center = TRUE, scale. = TRUE)
@@ -409,7 +473,9 @@ p2 <- ggplot(data_pca, aes(x = PC1, y = PC2)) +
 print(p1)  # Matriz de dispersión creada con ggpairs
 print(p2)  # Gráfico de componentes principales
 ```
+
 Ahora los resultados de aplicar el PCA usando el summary para ver el resumen:
+
 ```{r}
 # Resumen del PCA (sin sobrescribir el objeto original)
 pca_summary <- summary(pca)
@@ -419,15 +485,17 @@ print(pca$center)
 print(pca$scale)
 print(pca_summary)
 ```
+
 ```{r}
 prcomp(Data$credit_score)
 ```
-Sin usar ninguna función de R para reducir la dimensionalidad lo haremos de la siguiente manera:
-1er paso: Realizaremos la normal de nuestro conjunto de datos:
+
+Sin usar ninguna función de R para reducir la dimensionalidad lo haremos de la siguiente manera: 1er paso: Realizaremos la normal de nuestro conjunto de datos:
+
 ```{r}
 set.seed(1234)
 
-data_cont <- Data[, c("credit_score", "age", "tenure", "balance", "products_number")]
+data_cont <- train[, c("credit_score", "age", "tenure", "balance", "products_number")]
 data_cont <- na.omit(data_cont)
 
 X_data <- as.matrix(data_cont)
@@ -443,13 +511,15 @@ X_data <- sweep(X_data, 2, medias_data, "-")
 X_norm <- sweep(X_data, 2, desv_data, "/")
 ```
 
-
 2º paso: Calculamos la matriz de covarianza.
+
 ```{r}
 C <- cov(X_norm)
 print(C)
 ```
+
 3er paso: Calculamos los autovalores y autovectores, usamos "eigen"
+
 ```{r}
 # Descomponemos
 eig <- eigen(C, TRUE, only.values = FALSE, EISPACK = FALSE)
@@ -460,6 +530,7 @@ autovectores <- eig$vectors
 print(autovectores)
 print(autovalores)
 ```
+
 4º paso: Proyectamos los datos normalizados en el espacio principal.
 
 ```{r}
@@ -467,12 +538,12 @@ Z <- X_norm %*% autovectores
 ```
 
 5º paso: Reducimos la dimensionalidad.
+
 ```{r}
 # Guardamos solo PC1 y PC2
 Z_red <- Z[,1:2]
 print(Z_red)
 ```
-
 
 # Análisis no supervisado
 
@@ -488,15 +559,32 @@ head(datos_escalados)
 ```
 
 Matriz de distancias
+
 ```{r}
-#esto no va nose porque
+distance <- get_dist(datos_escalados, method = "euclidean")
+print(as.matrix(distance)[1:5, 1:5])
 
-#distance <- get_dist(datos_escalados)
+# para visualizarlo, vamos a utilizar una muestra para optimizar el rendimiento
+tamaño_muestra <- floor(0.1 * nrow(datos_escalados))
+sampled_data <- datos_escalados[sample(seq_len(nrow(datos_escalados)), size = tamaño_muestra), ]
 
-#fviz_dist(distance, gradient = list(low = "#00AFBB", mid = "white", high = "#FC4E07"))
+# Calculate the distance matrix on the sampled data
+distance_matrix_sampled <- get_dist(sampled_data, method = "euclidean")
+
+# Visualize the distance matrix
+fviz_dist(distance_matrix_sampled) 
+
 ```
 
-Podemos aplicar el algoritmo de las k-medias con k = 2 
+A partir de esto, podemos observar como se cumplen las condiciones para ser una métrica o medida de desemejanza:
+
+-   Coincidencia: podemos ver que cuando x=y el valor es 0
+
+-   No negatividad: el valor más bajo de nuestra matriz de distancias es 0
+
+-   Simetría: con el gráfico podemos ver como la matriz es simétrica respecto al eje formado por x = y
+
+S Podemos aplicar el algoritmo de las k-medias con k = 2
 
 ```{r}
 k_medias <- kmeans(datos_escalados, centers = 2, nstart = 25)
@@ -518,6 +606,7 @@ k_medias$size
 ```
 
 Visualización de los clusters
+
 ```{r}
 fviz_cluster(k_medias, data = datos_escalados)
 ```
@@ -532,8 +621,7 @@ set.seed(123)
 fviz_nbclust(datos_escalados, kmeans, method = "wss")
 ```
 
-
-En este análisis, a partir de 4 clusters, la reducción en la suma total de cuadrados internos parece estabilizarse, indicando que k = 4 es una buena opción. 
+En este análisis, a partir de 4 clusters, la reducción en la suma total de cuadrados internos parece estabilizarse, indicando que k = 4 es una buena opción.
 
 ```{r}
 k4 <- kmeans(datos_escalados, centers = 4, nstart = 25)
@@ -543,15 +631,11 @@ k4
 
 ```
 
-
-
 ```{r}
 set.seed(595)
 table(k_medias$cluster, k4$cluster)
 
 ```
-
-
 
 MÉTODO DE LA SILUETA
 
@@ -561,15 +645,15 @@ fviz_nbclust(datos_escalados, kmeans, method = "silhouette")
 
 ```
 
-
 Con esta técnica, en nuestros datos, parece que la mejor elección es k igual a 2.
+
 ```{r}
 sil <-  silhouette(k_medias$cluster, dist(datos_escalados))
 
 fviz_silhouette(sil)
 ```
 
-La interpretación del coeficiente de la silueta la entendemos como que un valor positivo significa que la obervación está bien agrupada. Cuanto más se acerque al coeficiente a 1, mejor agrupada estará la observacíon. En cambio, un valor negativo significa que la obervación  está mal agrupada. Finalmente, un valor igual a 0 significa que la observación se encuentra entre dos conglomerados.
+La interpretación del coeficiente de la silueta la entendemos como que un valor positivo significa que la obervación está bien agrupada. Cuanto más se acerque al coeficiente a 1, mejor agrupada estará la observacíon. En cambio, un valor negativo significa que la obervación está mal agrupada. Finalmente, un valor igual a 0 significa que la observación se encuentra entre dos conglomerados.
 
 El gráfico anterior y el coeficiente de silueta medio ayudan a determinar si la agrupación es buena o no.
 
@@ -585,8 +669,6 @@ gap <-  clusGap(datos_escalados, FUN = kmeans, nstart = 25, K.max = 10, B = 50)
 print(gap, method = "firstmax")
 ```
 
-
-
 ```{r}
 fviz_gap_stat(gap)
 ```
@@ -599,13 +681,11 @@ k6 <-  kmeans(datos_escalados, centers = 6, iter.max = 10, nstart = 25)
 fviz_cluster(k6, data = datos_escalados)
 ```
 
-
 Esquema de agrupación a partir de los diferentes resultados obtenidos variando todas las combinaciones de clústeres, medias de diatancia y métodos de agrupación
 
 ```{r}
 # nb <-  NbClust(datos_escalados, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
 ```
-
 
 ```{r}
 n_clust <-  n_clusters(as.data.frame(datos_escalados), 
@@ -618,20 +698,14 @@ n_clust
 plot(n_clust)
 ```
 
-
 ```{r}
 data_cont %>%
   mutate(clusters = k6$cluster) %>%
   group_by(clusters) %>%
   summarise_all("mean")
 ```
-Podemos interpretar esta tabla de diferenciación de las medias de la siguiente manera:
-- Edad más alta en el clúster 2 (60.86 años): Este grupo podría representar clientes mayores, tal vez personas cercanas a la jubilación.
-- Balance muy bajo en el clúster 3 (3134.47): Podría tratarse de clientes con cuentas nuevas o de bajo poder adquisitivo.
-- Balance alto en clúster 1 y 4 (121k-124k): Probablemente clientes con mayor poder adquisitivo o que mantienen altos saldos en sus cuentas.
-- Credit score más bajo en clúster 5 (640.05): Este grupo podría representar clientes con menor solvencia o más riesgo crediticio.
-- Tenure más alto en clúster 5 (7.59 años): Clientes que han estado más tiempo con la entidad financiera, pero con saldo bajo.
 
+Podemos interpretar esta tabla de diferenciación de las medias de la siguiente manera: - Edad más alta en el clúster 2 (60.86 años): Este grupo podría representar clientes mayores, tal vez personas cercanas a la jubilación. - Balance muy bajo en el clúster 3 (3134.47): Podría tratarse de clientes con cuentas nuevas o de bajo poder adquisitivo. - Balance alto en clúster 1 y 4 (121k-124k): Probablemente clientes con mayor poder adquisitivo o que mantienen altos saldos en sus cuentas. - Credit score más bajo en clúster 5 (640.05): Este grupo podría representar clientes con menor solvencia o más riesgo crediticio. - Tenure más alto en clúster 5 (7.59 años): Clientes que han estado más tiempo con la entidad financiera, pero con saldo bajo.
 
 ```{r}
 res_kmeans <-  cluster_analysis(datos_escalados, 
@@ -640,7 +714,6 @@ res_kmeans <-  cluster_analysis(datos_escalados,
 
 plot(summary(res_kmeans))
 ```
-
 
 ```{r}
 set.seed(4321)
@@ -674,7 +747,6 @@ clara_clusters <- clara(x = datos_escalados, k = 2, metric = "manhattan", stand 
 clara_clusters
 ```
 
-
 ```{r}
 fviz_cluster(object = clara_clusters, ellipse.type = "t", geom = "point",
              pointsize = 2.5) +
@@ -682,13 +754,3 @@ fviz_cluster(object = clara_clusters, ellipse.type = "t", geom = "point",
   labs(title = "Resultados clustering CLARA") +
   theme(legend.position = "none")
 ```
-
-
-
-
-
-
-
-
-
-
