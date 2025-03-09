@@ -9,7 +9,7 @@ output:
       collapsed: true
 ---
 
-### Introducción
+## Introducción
 
 Objetivo:
 
@@ -36,7 +36,7 @@ Tipo de Problema:
 
 Este es un problema de clasificación binaria. El objetivo es clasificar a los clientes en dos categorías: aquellos que se irán (1) y aquellos que se quedarán (0).
 
-### Business understanding
+## Business understanding
 
 Planteamos preguntas sobre nuestros datos:
 
@@ -50,7 +50,7 @@ Planteamos preguntas sobre nuestros datos:
 
 -   ¿Influye el país?
 
-### Data understanding
+## Data understanding ydivisión de los datos
 
 Importamos las librerías
 
@@ -117,7 +117,7 @@ train$country <- as.factor(train$country)
 train$gender <- as.factor(train$gender)
 ```
 
-### Exploratory Data Analysis
+## Exploratory Data Analysis
 
 Veamos un resumen de algunos de los estadísticos principales de cada columna
 
@@ -300,12 +300,7 @@ alpha <- 0.05
 train %>%
   group_by(churn) %>%
   summarize(p_value = shapiro.test(estimated_salary)$p.value)
-if(p_value<alpha){
-  
-  print("No sigue una distribución normal")
-}else{
-  print("sigue una distribución normal")
-}
+
 ```
 
 Como no sigue una distribución normal debemos utilizar un test no paramétrico coomo el de wilcoxon para comprobar si existe una diferencia significativa.
@@ -418,7 +413,7 @@ ggplot(train, aes(x = factor(churn), y = balance, fill = factor(churn))) +
 ```
 
 ```{r distribucion balance}
-Strain %>%
+train %>%
   group_by(churn) %>%
   summarize(p_value = shapiro.test(age)$p.value)
 if(p_value<alpha){
@@ -440,14 +435,14 @@ if (p_value < alpha) {
 ```
 Se observa que cuanto mayor es el balance, mayor es la probabilidad de que el cliente se cambie de banco
 
-### Tecnica de reducción a la dimensión (PCA).
+## Tecnica de reducción a la dimensión (PCA).
 
-Con el siguiente código veremos cómo afecta el uso del PCA a nuestros datos.
+Con el siguiente código veremos cómo afecta el uso del PCA a nuestros datos. Para utilizar PCA únicamente utilizamos los datos continuos de nuestro dataset
 
 ```{r}
 set.seed(1234)
 
-data_cont <- train[, c("credit_score", "age", "tenure", "balance", "products_number")]
+data_cont <- train[, c("credit_score", "age", "tenure", "balance", "products_number", "estimated_salary")]
 data_cont <- na.omit(data_cont)
 
 pca <- prcomp(data_cont, center = TRUE, scale. = TRUE)
@@ -495,7 +490,7 @@ Sin usar ninguna función de R para reducir la dimensionalidad lo haremos de la 
 ```{r}
 set.seed(1234)
 
-data_cont <- train[, c("credit_score", "age", "tenure", "balance", "products_number")]
+data_cont <- train[, c("credit_score", "age", "tenure", "balance", "products_number", "estimated_salary")]
 data_cont <- na.omit(data_cont)
 
 X_data <- as.matrix(data_cont)
@@ -530,22 +525,11 @@ autovectores <- eig$vectors
 print(autovectores)
 print(autovalores)
 ```
+Podemos ver como el resultado es el mismo que aplicando la función prcomp
 
-4º paso: Proyectamos los datos normalizados en el espacio principal.
+## Aprendizaje no supervisado
 
-```{r}
-Z <- X_norm %*% autovectores
-```
-
-5º paso: Reducimos la dimensionalidad.
-
-```{r}
-# Guardamos solo PC1 y PC2
-Z_red <- Z[,1:2]
-print(Z_red)
-```
-
-# Análisis no supervisado
+### Clustering no jerárquico
 
 En primer lugar vamos a calcular la distancia Euclídea entre las observaciones de la base de datos. También mostraremos la matriz de distancias.
 
@@ -584,7 +568,7 @@ A partir de esto, podemos observar como se cumplen las condiciones para ser una 
 
 -   Simetría: con el gráfico podemos ver como la matriz es simétrica respecto al eje formado por x = y
 
-S Podemos aplicar el algoritmo de las k-medias con k = 2
+Para empezar, podemos aplicar el algoritmo de las k-medias con k = 2, luego iremos ajustando el número de clusters para llegar al óptimo
 
 ```{r}
 k_medias <- kmeans(datos_escalados, centers = 2, nstart = 25)
@@ -596,13 +580,6 @@ Si imprimimos los resultados vemos que la técnica de agrupaciones dio lugar a 2
 ```{r}
 set.seed(595)
 k_medias
-k_medias$cluster
-k_medias$totss
-k_medias$betweenss
-k_medias$withinss
-k_medias$tot.withinss
-k_medias$size
-
 ```
 
 Visualización de los clusters
@@ -624,13 +601,14 @@ fviz_nbclust(datos_escalados, kmeans, method = "wss")
 En este análisis, a partir de 4 clusters, la reducción en la suma total de cuadrados internos parece estabilizarse, indicando que k = 4 es una buena opción.
 
 ```{r}
+set.seed(595)
 k4 <- kmeans(datos_escalados, centers = 4, nstart = 25)
 
 fviz_cluster(k4, data = datos_escalados)
 k4
 
 ```
-
+Del plot de los clusters podemos ver como este numero de clusters no es ideal, ya que se mezclan demasiado entre ellos, sin haber una diferenciación clara entre clusters. 
 ```{r}
 set.seed(595)
 table(k_medias$cluster, k4$cluster)
@@ -653,7 +631,7 @@ sil <-  silhouette(k_medias$cluster, dist(datos_escalados))
 fviz_silhouette(sil)
 ```
 
-La interpretación del coeficiente de la silueta la entendemos como que un valor positivo significa que la obervación está bien agrupada. Cuanto más se acerque al coeficiente a 1, mejor agrupada estará la observacíon. En cambio, un valor negativo significa que la obervación está mal agrupada. Finalmente, un valor igual a 0 significa que la observación se encuentra entre dos conglomerados.
+La interpretación del coeficiente de la silueta la entendemos como que un valor positivo significa que la observación está bien agrupada. Cuanto más se acerque al coeficiente a 1, mejor agrupada estará la observacíon. En cambio, un valor negativo significa que la obervación está mal agrupada. Finalmente, un valor igual a 0 significa que la observación se encuentra entre dos conglomerados.
 
 El gráfico anterior y el coeficiente de silueta medio ayudan a determinar si la agrupación es buena o no.
 
@@ -663,8 +641,8 @@ El proceso es el siguiente: se aplica el algoritmo de clustering a los datos con
 
 ```{r}
 set.seed(123)
-
-gap <-  clusGap(datos_escalados, FUN = kmeans, nstart = 25, K.max = 10, B = 50)
+# como el dataset es muy grande, vamos a utilizar una muestra de nuestro dataset
+gap <-  clusGap(sampled_data, FUN = kmeans, K.max = 10, nstart = 25, B = 50)
 
 print(gap, method = "firstmax")
 ```
@@ -673,22 +651,23 @@ print(gap, method = "firstmax")
 fviz_gap_stat(gap)
 ```
 
-Parece ser que el número óptimo de clusters es 6.
+Parece ser que el número óptimo de clusters según este método es 1, algo que no tiene demasiado sentido.
 
 ```{r}
-k6 <-  kmeans(datos_escalados, centers = 6, iter.max = 10, nstart = 25)
+k1 <-  kmeans(datos_escalados, centers = 1, iter.max = 10, nstart = 25)
 
-fviz_cluster(k6, data = datos_escalados)
+fviz_cluster(k1, data = datos_escalados)
 ```
 
-Esquema de agrupación a partir de los diferentes resultados obtenidos variando todas las combinaciones de clústeres, medias de diatancia y métodos de agrupación
+Esquema de agrupación a partir de los diferentes resultados obtenidos variando todas las combinaciones de clústeres, medias de distancia y métodos de agrupación
 
 ```{r}
-# nb <-  NbClust(datos_escalados, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
+# de nuevo para facilitar el procesamiento utilizamos una muestra del dataset
+ nb <-  NbClust(sampled_data, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
 ```
-
+Las dos primeras gráficas me indican que, a más clusters, mejor es la estadística de Hubert y mejor es el ajuste de los clusters, además nos dice que el mejor número de clusters respecto a dicha estadística es 3 y que a partir de 4 ya deja de tener sentido hacer más clusters. A pesar de esto, como hemos podido ver con los 4 clusters, perdemos mucha explicabilidad, ya que se empiezan a mezclar los clusters, por lo que, aunque respecto a la estadística de Hubert es lo más apropiado, puede no ser el número óptimo de clusters. Las siguientes dos gráficas nos dicen lo siguiente: El primero nos dice que según la métrica de la silueta, a más clusters, peor, como hemos podido observar anteriormente. La última nos dice que el mejor número de clusters en este sentido es 2 y que a partir de ahí, el clustering empieza a ser peor. 
 ```{r}
-n_clust <-  n_clusters(as.data.frame(datos_escalados), 
+n_clust <-  n_clusters(as.data.frame(sampled_data), 
                        package = c("easystarts", "NbClust", "mclust"),
                        standardize = FALSE)
 n_clust
@@ -697,52 +676,58 @@ n_clust
 ```{r}
 plot(n_clust)
 ```
+Esta función, que compara el número de clusters óptimo obtenido mediante varios métodos, nos dice claramente que el mejor número es 3.
+
+```{r}
+set.seed(100)
+k3 <-  kmeans(datos_escalados, centers = 3, iter.max = 10, nstart = 25)
+
+fviz_cluster(k3, data = datos_escalados)
+```
+Podemos ver como hay tres conjuntos relativamente bien diferenciados. Hay solapamiento ya que nuestras dos primeras componentes principales no muestran demasiada información del dataset. Tendríamos que representarlo en más dimensiones para poder verlo mejor
 
 ```{r}
 data_cont %>%
-  mutate(clusters = k6$cluster) %>%
+  mutate(clusters = k3$cluster) %>%
   group_by(clusters) %>%
   summarise_all("mean")
 ```
 
-Podemos interpretar esta tabla de diferenciación de las medias de la siguiente manera: - Edad más alta en el clúster 2 (60.86 años): Este grupo podría representar clientes mayores, tal vez personas cercanas a la jubilación. - Balance muy bajo en el clúster 3 (3134.47): Podría tratarse de clientes con cuentas nuevas o de bajo poder adquisitivo. - Balance alto en clúster 1 y 4 (121k-124k): Probablemente clientes con mayor poder adquisitivo o que mantienen altos saldos en sus cuentas. - Credit score más bajo en clúster 5 (640.05): Este grupo podría representar clientes con menor solvencia o más riesgo crediticio. - Tenure más alto en clúster 5 (7.59 años): Clientes que han estado más tiempo con la entidad financiera, pero con saldo bajo.
+Podemos interpretar esta tabla de diferenciación de las medias de la siguiente manera:
+
+-   El primer cluster es de la gente que lleva menos tiempo en el banco, pero que tiene mucho dinero metido en el y tienen el mejor credit score
+
+-   El segundo es gente que lleva más tiempo que los anteriores en el banco, ganan más o menos lo mismo que los anteriores, pero su balance es mucho menor. También     son los que más productos tienen del banco. Su credit score es intermedio
+
+-   Por último, el tercer cluster se compone de la gente que más tiempo lleva en el banco, más dinero tiene y más gana, pero con el menor credit score. 
+
 
 ```{r}
 res_kmeans <-  cluster_analysis(datos_escalados, 
-                                n = 6,
+                                n = 3,
                                 method = "kmeans")
 
 plot(summary(res_kmeans))
 ```
+Este análisis del cluster confirma nuestras conclusiones extraídas de la tabla de diferenciación. 
+
+A continuación vamos a probar con k-medioides en vez de con k-medias. Primeramente utilizamos el metodo pam, con distancia manhattan en vez de la distancia euclídea
 
 ```{r}
-set.seed(4321)
-pam_clusters <- pam(x = datos_escalados, k = 6, metric = "manhattan")
-pam_clusters
+set.seed(100)
+pam_cluster <- pam(x = datos_escalados, k = 3, metric = "manhattan")
+pam_cluster
 
-fviz_cluster(object = pam_cluster, data = datos_escalados, ellipse = "t", 
+fviz_cluster(object = pam_cluster, data = datos_escalados, ellipse = TRUE, 
              repel = TRUE) +
   theme_bw() +
-  labs(title = " Resultados clustering PAM") + theme(legend.position = "none")
+  labs(title = "Resultados clustering PAM") + theme(legend.position = "none")
 ```
-
-Una de las limitaciones del método de clusters es que se requiere mucha memoria RAM, por lo que cuando el set de datos contiene muchas observaciones es imposible, igual que nuestro dataset.
-
-Entonces vamos a simular un set de datos bidimensional con 500 observaciones, de las cuales 200 pertenecen a un grupo y 300 a otro.
+Podemos ver que no es un método idóneo, ya que hay mucho solapamiento entre clusters. 
+Vamos a probar con el método de los clara clusters
 
 ```{r}
-set.seed(1234)
-grupo_1 <- cbind(rnorm(n = 200, mean = 0, sd = 8),
-                 rnorm(n = 200, mean = 0, sd = 8))
-grupo_2 <- cbind(rnorm(n = 300, mean = 30, sd = 8),
-                 rnorm(n = 300, mean = 30, sd = 8))
-datos <- rbind(grupo_1, grupo_2)
-colnames(datos) <- c("x", "y")
-head(datos)
-```
-
-```{r}
-clara_clusters <- clara(x = datos_escalados, k = 2, metric = "manhattan", stand = TRUE,
+clara_clusters <- clara(x = datos_escalados, k = 3, metric = "manhattan", stand = TRUE,
                         samples = 50, pamLike = TRUE)
 clara_clusters
 ```
@@ -754,3 +739,12 @@ fviz_cluster(object = clara_clusters, ellipse.type = "t", geom = "point",
   labs(title = "Resultados clustering CLARA") +
   theme(legend.position = "none")
 ```
+
+Podemos ver como es bastante más parecido al resultado obtenido con k-means, aunque aquí se puede ver como solamente toma una muestra del dataset completo. 
+
+### Clustering jerárquico
+
+Después de haber hecho clustering no jerárquico con k-medias y k-medioides, obteniendo resultados similares, vamos a aplicar métodos de clustering jerárquico. 
+
+
+
