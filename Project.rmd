@@ -9,7 +9,7 @@ output:
       collapsed: true
 ---
 
-z ## Indice:
+## Indice:
 
 -   Comprensión del problema. Explicación. Lectura de datos. Particiones (Gonzalo)
 
@@ -353,11 +353,7 @@ wilcox_result <- wilcox.test(estimated_salary ~ churn, data = train)
 print(wilcox_result)
 alpha <-  0.05
 p_value <- wilcox_result$p.value
-if (p_value < alpha) {
-  print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
-} else {
-  print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
-}
+
 ```
 
 Como ya podíamos intuir por la gráfica no hay una diferencia significativa respecto al salario
@@ -384,17 +380,19 @@ alpha <- 0.05
 train %>%
   group_by(churn) %>%
   summarize(p_value = shapiro.test(tenure)$p.value)
-if(p_value<alpha){
-  
-  print("No sigue una distribución normal")
-}else{
-  print("sigue una distribución normal")
-}
+
 ```
 
 Sigue una distribución normal. Utilizamos un test t para comprobar si existe alguna diferencia significativa.
 
+```{r contraste tenure-churn}
+t_test_result <- t.test(tenure ~ churn, data = train)
+print(t_test_result)
 
+p_value <- t_test_result$p.value
+
+
+```
 
 Por tanto podemos decir que el hecho de abandonar o no el banco sí depende del tiempo que llevan los clientes en el mismo.
 
@@ -420,8 +418,8 @@ train %>%
 
 Vemos que age no sigue una distribución normal, por lo que aplico un test de wilcoxon
 
-```{r contraste tenure-churn}
-wilcox_result <- wilcox.test(tenure ~ churn, data = train)
+```{r }
+wilcox_result <- wilcox.test(age ~ churn, data = train)
 print(wilcox_result)
 p_value <- wilcox_result$p.value
 if (p_value < alpha) {
@@ -956,18 +954,15 @@ Podemos ver como ahora los clusters se dividen de la siguiente manera:
 
 ## Conclusiones
 
-Las conclusiones que podemos sacar del EDA podemos decir que de una manera u otra pueden ser algunas más lógicas que ellas pero nos debemos cerciorar de que nuestras hipótesis y pensamientos pueden ser respaldados por datos.
+Primeramente hemos podido ver que nuestro dataset está muy completo, sin datos faltantes ni outliers que nos puedan dificultar nuestro análisis de los mismos.
+Al observar las distribuciones de nuestro dataset, hemos visto que nuestras variables contínuas siguen en su mayoría distriones cercanas a la normal, además de tener bastantes variables binarias que nos pueden dar mucha información a futuro cuando apliquemos algoritmos de clasificación binaria para preedecir si un cliente va o no a abandonar el banco.
 
-Primeramente el cerciorarse de que no hay valores faltantes en nuestros datos ya que el hecho de que falten datos podría afectar a nuestro modelo para entender los datos y sacar conclusiones de ellos.
-Al observar las distribuciones de nuestro dataset, hemos visto que hay variables continuas que no nos dan ninguna información añadida como active_member que al ser una variable binomial su distribución es bastante fácil de observar, por ello hemos usado esa funcion en ver cómo balance, credit_score y estimated_salary, como dijimos antes, balance sigue una distribución normal fuera de los ceros que tiene el dataset, si eliminamos los ceros vemos una variable normal de la misma manera credit_score.
-
-Podemos observar que la tasa de personas que se mantienen en el banco es mayor que la de la gente que se va, varios gráficos más abajo vemos las relaciones de cada variable con el abandono del banco y podemos ver como lo más relacionado con el abandono es la edad, respecto a eso poco se puede hacer porque vemos que tenemos clientes que llevan mas de años en el banco por lo que vemos una gran fidelización de nuestra clientela pero siempre mejorable, pero el segundo dato con mayor relación es balance, la variable balance muestra el dinero restante de cada cliente en el banco y vemos que esa variable si que tiene una mayor relación con el abandono
+Podemos observar que la tasa de personas que se mantienen en el banco es mayor que la de la gente que se va, también vemos las relaciones de cada variable con el abandono del banco y podemos ver como algunas de las variables más relacionadas con el abandono son la edad o el balance, que muestra el dinero restante de cada cliente en el banco.
 
 Podemos ver  hay cerca de un 80% de los clientes del banco que no lo abandonan y poco más del 20% que sí, de esa tasa de abandono cercana al 20% son más mujeres que hombres las que abandonan el banco, en cambio si filtramos por países los alemanes son más propensos a irse del banco.
 
-La relación del dinero con el banco es muy interesante, no solo el dinero que tienen en el banco si no el salario que estimamos que tiene cada cliente con su permanencia con nosotros, podemos ver que realmente el salario estimado no tiene relacion alguna ni con el abandono ni con la permanencia de nuestro cliente, mientras que el balance y el dinero que tengan en el banco sí que lo es, ya que a mayor balance, podemos observar una mayor tendencia a abandonar el banco.
-
-Respecto a la edad y el tiempo que llevan en el banco vemos que influye, a mayor edad la tasa de abandono es mayor, es algo que la empresa debería mejorar y obtener mejores resultados de estas variables.
+La relación del dinero con el banco es interesante, no solo el dinero que tienen en el banco si no el salario que estimamos que tiene cada cliente con su permanencia en el banco, podemos ver que realmente el salario estimado no tiene relacion alguna ni con el abandono ni con la permanencia de los cliente, mientras que el balance sí que importa para que una persona se quede en el banco o no, ya que a mayor balance, podemos observar una mayor tendencia a abandonar el banco.
+Respecto a la edad y el tiempo que llevan en el banco vemos que también influyen, a mayor edad la tasa de abandono es mayor.
 
 En cuanto al PCA, nuestras dos primeras componentes principales nos muestran solamente un 40% aproximado de la información, por lo todos nuestros clusters, independientemente del método que utilicemos, se van a ver solapados, ya que no tienen mucha cantidad de información del dataset. Si visualizáramos en más dimensiones quedaría más clara la separación de los clusters. 
 
@@ -977,7 +972,7 @@ También para reducir la dimensionalidad podríamos utilizar los mapas auto-orga
 
 Asimismo, nuestra matriz de distancias está computada con las distancias euclídeas entre nuestros datos contínuos, ganaríamos más precisión si creáramos nosotros una matriz de distancias teniendo en cuenta estas variables binarias también, además de las variables categóricas. 
 
-En cuanto a los distintos métodos de clustering, tanto para clustering jerárquico como no jerárquico, vemos que el número de clusters es igual, a pesar de eso, los clusters que obtenemos mediante los métodos jerárquicos y no jerárquicos. Con k-means y k-medioides con el método clara tenemos un resultado bastante similar y con los métodos jerárquicos y el método PAM tenemos resultados también similares, pero diferentes a los anteriores. Estos resultados se diferencian entre si por el criterio que utilizan a la hora de separar los valores. Mientras que el clustering jerárquico separa los puntos por edad, credit score, balance y productos, siendo bastante importantes a la hora de diferenciar los conjuntos el número de productos, el balance y el credit score; el clustering no jerárquico da mayor importancia a al tiempo que llevan los clientes en el banco (tenure), el balance de las cuentas y el credit score. 
+En cuanto a los distintos métodos de clustering, tanto para clustering jerárquico como no jerárquico, vemos que el número de clusters es igual, a pesar de eso, los clusters que obtenemos mediante los métodos jerárquicos y no jerárquicos. Con k-means y k-medioides con el método clara tenemos un resultado bastante similar y con los métodos jerárquicos y el método PAM tenemos resultados también similares, pero diferentes a los anteriores. Estos resultados se diferencian entre si por el criterio que utilizan a la hora de separar los valores. Mientras que el clustering jerárquico separa los puntos por edad, credit score, balance y productos, siendo bastante importantes a la hora de diferenciar los conjuntos el número de productos, el balance y el credit score; el clustering no jerárquico da mayor importancia a al tiempo que llevan los clientes en el banco (tenure), el balance de las cuentas y el credit score. Esto se asemeja a las primeras conclusiones que pudimos extraer del dataset al hacer el EDA, donde pudimos ver que el balance, la edad y el tiempo que llevan los clientes en el banco son factores importantes y diferenciales. 
 
 Estos grupos pueden servir después para ver qué grupo es más probable que abandone el banco en algún momento en base al grupo al que pertenezca, esto lo podremos hacer con los métodos de aprendizaje supervisado que veremos más adelante en la asignatura, con los que podremos predecir esto
 
