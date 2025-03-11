@@ -9,7 +9,7 @@ output:
       collapsed: true
 ---
 
-## Indice:
+z ## Indice:
 
 -   Comprensión del problema. Explicación. Lectura de datos. Particiones (Gonzalo)
 
@@ -319,7 +319,7 @@ Vemos como los clientes franceses y los españoles son menos propensos que los a
 
 Vamos a intentar contestar las preguntas que nos hicimos al inicio:
 
-\- ¿Influye el salario en si el cliente deja el banco?
+- ¿Influye el salario en si el cliente deja el banco?
 
 ```{r churn vs salario}
 ggplot(train, aes(x = factor(churn), y = estimated_salary, fill = factor(churn))) +
@@ -432,12 +432,22 @@ train %>%
 
 Vemos que age no sigue una distribución normal, por lo que aplico un test de wilcoxon
 
+```{r contraste tenure-churn}
+wilcox_result <- wilcox.test(tenure ~ churn, data = train)
+print(wilcox_result)
+p_value <- wilcox_result$p.value
+if (p_value < alpha) {
+  print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
+} else {
+  print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
+}
+```
 ```{r contraste age-churn}
 wilcox_result <- wilcox.test(age ~ churn, data = train)
 print(wilcox_result)
 p_value <- wilcox_result$p.value
 if (p_value < alpha) {
-  print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
+  print("Rechazamos la hipótesis nula. Hay una diferencia significativa con la edad de los clientes y los que abandonan el banco y aquellos que no")
 } else {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
@@ -958,7 +968,18 @@ Podemos ver como ahora los clusters se dividen de la siguiente manera:
 
 ## Conclusiones
 
-Eda
+Las conclusiones que podemos sacar del EDA podemos decir que de una manera u otra pueden ser algunas más lógicas que ellas pero nos debemos cerciorar de que nuestras hipótesis y pensamientos pueden ser respaldados por datos.
+
+Primeramente el cerciorarse de que no hay valores faltantes en nuestros datos ya que el hecho de que falten datos podría afectar a nuestro modelo para entender los datos y sacar conclusiones de ellos.
+Al observar las distribuciones de nuestro dataset, hemos visto que hay variables continuas que no nos dan ninguna información añadida como active_member que al ser una variable binomial su distribución es bastante fácil de observar, por ello hemos usado esa funcion en ver cómo balance, credit_score y estimated_salary, como dijimos antes, balance sigue una distribución normal fuera de los ceros que tiene el dataset, si eliminamos los ceros vemos una variable normal de la misma manera credit_score.
+
+Podemos observar que la tasa de personas que se mantienen en el banco es mayor que la de la gente que se va, varios gráficos más abajo vemos las relaciones de cada variable con el abandono del banco y podemos ver como lo más relacionado con el abandono es la edad, respecto a eso poco se puede hacer porque vemos que tenemos clientes que llevan mas de años en el banco por lo que vemos una gran fidelización de nuestra clientela pero siempre mejorable, pero el segundo dato con mayor relación es balance, la variable balance muestra el dinero restante de cada cliente en el banco y vemos que esa variable si que tiene una mayor relación con el abandono
+
+Podemos ver  hay cerca de un 80% de los clientes del banco que no lo abandonan y poco más del 20% que sí, de esa tasa de abandono cercana al 20% son más mujeres que hombres las que abandonan el banco, en cambio si filtramos por países los alemanes son más propensos a irse del banco.
+
+La relación del dinero con el banco es muy interesante, no solo el dinero que tienen en el banco si no el salario que estimamos que tiene cada cliente con su permanencia con nosotros, podemos ver que realmente el salario estimado no tiene relacion alguna ni con el abandono ni con la permanencia de nuestro cliente, mientras que el balance y el dinero que tengan en el banco sí que lo es, ya que a mayor balance, podemos observar una mayor tendencia a abandonar el banco.
+
+Respecto a la edad y el tiempo que llevan en el banco vemos que influye, a mayor edad la tasa de abandono es mayor, es algo que la empresa debería mejorar y obtener mejores resultados de estas variables.
 
 En cuanto al PCA, nuestras dos primeras componentes principales nos muestran solamente un 40% aproximado de la información, por lo todos nuestros clusters, independientemente del método que utilicemos, se van a ver solapados, ya que no tienen mucha cantidad de información del dataset. Si visualizáramos en más dimensiones quedaría más clara la separación de los clusters. 
 
