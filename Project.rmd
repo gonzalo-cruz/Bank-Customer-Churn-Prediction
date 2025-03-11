@@ -394,19 +394,7 @@ if(p_value<alpha){
 
 Sigue una distribución normal. Utilizamos un test t para comprobar si existe alguna diferencia significativa.
 
-```{r contraste tenure-churn}
-t_test_result <- t.test(tenure ~ churn, data = train)
-print(t_test_result)
 
-p_value <- t_test_result$p.value
-alpha <- 0.5
-
-if (p_value < alpha){
-  print("Rechazamos la hipótesis nula. Hay una diferencia significativa en el tiempo que son clientes entre aquellos que abandonan el banco y aquellos que no")
-} else {
-  print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
-}
-```
 
 Por tanto podemos decir que el hecho de abandonar o no el banco sí depende del tiempo que llevan los clientes en el mismo.
 
