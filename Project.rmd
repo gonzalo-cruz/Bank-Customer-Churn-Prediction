@@ -1,6 +1,6 @@
 ---
 title: "Bank Customer Churn"
-author: "Gonzalo Cruz Gómez, Samuel Martínez Lorente, Jorge Tordesillas García"
+author: "Grupo 6: Gonzalo Cruz Gómez, Samuel Martínez Lorente, Jorge Tordesillas García"
 output: 
   html_document:
     theme: flatly
@@ -9,7 +9,29 @@ output:
       collapsed: true
 ---
 
-## Introducción
+## Indice:
+
+-   Comprensión del problema. Explicación. Lectura de datos. Particiones (Gonzalo)
+
+-   Preparación de datos y EDA (Gonzalo)
+
+-   Técnicas de reducción de la dimensionalidad (Samuel)
+
+    -   PCA con prcomp
+
+    -   PCA manual
+
+-   Aprendizaje no supervisado
+
+    -   Matriz de distancias (Gonzalo y Jorge)
+
+    -   Clustering no jerárquico (Gonzalo y Jorge)
+
+    -   Clustering jerárquico (Gonzalo)
+
+-   Conclusiones (Gonzalo, Samuel, Jorge)
+
+## Comprensión del problema. Explicación. Lectura de datos. Particiones
 
 Objetivo:
 
@@ -19,14 +41,14 @@ Descripción de Datos (Variables):
 
 ```         
 CustomerId: Identificador único para cada cliente. (Tipo: Numérico)
-CreditScore: Puntaje de crédito del cliente. (Tipo: Numérico)
+Credit_score: Puntaje de crédito del cliente. (Tipo: Numérico)
 Country: País donde reside el cliente (por ejemplo, Francia, España, Alemania). (Tipo: Categórico)
 Gender: Género del cliente (Masculino o Femenino). (Tipo: Categórico)
 Age: Edad del cliente. (Tipo: Numérico)
 Tenure: Número de años que el cliente ha sido cliente del banco. (Tipo: Numérico)
 Balance: Saldo en la cuenta bancaria del cliente. (Tipo: Numérico)
 Products_number: Número de productos bancarios que el cliente utiliza. (Tipo: Numérico)
-Card: Indica si el cliente tiene tarjeta de crédito (1 = Sí, 0 = No). (Tipo: Binario)
+Credit_card: Indica si el cliente tiene tarjeta de crédito (1 = Sí, 0 = No). (Tipo: Binario)
 Active_member: Indica si el cliente es un miembro activo (1 = Sí, 0 = No). (Tipo: Binario)
 EstimatedSalary: Salario estimado del cliente. (Tipo: Numérico)
 Churn: Variable objetivo. Indica si el cliente dejó el banco (1 = Sí, 0 = No). (Tipo: Binario)
@@ -36,7 +58,7 @@ Tipo de Problema:
 
 Este es un problema de clasificación binaria. El objetivo es clasificar a los clientes en dos categorías: aquellos que se irán (1) y aquellos que se quedarán (0).
 
-## Business understanding
+### Business understanding
 
 Planteamos preguntas sobre nuestros datos:
 
@@ -50,7 +72,7 @@ Planteamos preguntas sobre nuestros datos:
 
 -   ¿Influye el país?
 
-## Data understanding ydivisión de los datos
+### Data understanding y división de los datos
 
 Importamos las librerías
 
@@ -69,7 +91,7 @@ library(tidyverse)
 library(corrplot)
 ```
 
-Leemos los datos
+Leemos los datos y vemos sus dimensiones
 
 ```{r lectura de datos}
 Data <- read_csv("Bank Customer Churn Prediction.csv")
@@ -138,6 +160,7 @@ Vemos que no tenemos valores faltantes en ninguna columna.
 Visualizamos nuestros datos para ver cómo son y cómo están distribuidos
 
 ```{r visualizacion variables continuas}
+
 train_long <- train %>%
   dplyr::select(estimated_salary, balance, credit_score) %>%  
   tidyr::gather(key = "Variable", value = "Value")
@@ -155,7 +178,8 @@ ggplot(train_long, aes(x = Value, fill = Variable)) +
 
 Nuestras variables balance y credit score siguen distribuciones bastante similares a la normal (exceptuando el gran número de ceros en balance), mientras que el salario estimado sigue una distribución más uniforme.
 
-```{r vsualizacion variables discretas}
+```{r visualizacion variables discretas}
+
   train_long <- train %>%
     tidyr::pivot_longer(cols = c(products_number, active_member, churn),
                         names_to = "variable", values_to = "value")
@@ -169,6 +193,7 @@ Nuestras variables balance y credit score siguen distribuciones bastante similar
     theme_bw() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))  
   print(combined_plot)
+  
 ```
 
 Podemos ver como hay más gente que se queda en el banco respecto a la que se va, el numero de miembros activos y pasados es basicamente igual y que el número de productos más habitual es o 0 o 1, con muy pocos clientes teniendo más de 2.
@@ -183,6 +208,8 @@ plot_tenure_hist <- ggplot(train, aes(x = tenure)) +
 
 print(plot_tenure_hist)
 ```
+
+Tenemos una distribución bastante uniforme en el tiempo que está cada cliente en el banco.
 
 Ahora miramos las variables categóricas
 
@@ -231,7 +258,7 @@ ggplot(train, aes(x = estimated_salary, y = credit_score)) +
 
 Podemos ver como siguen distribuciones bastante normales, con la excepción de los datos con valor 0 del balance, que como hay muchos, tienen mucho peso.
 
-Hacemos una matriz de correlación para ver como están relacionadas nuestras variables: 
+Hacemos una matriz de correlación para ver como están relacionadas nuestras variables entre ellas:
 
 ```{r}
 train_filtered <- train %>% select(-country, -gender)
@@ -239,7 +266,8 @@ correlation_matrix <- cor(train_filtered)
 corrplot(correlation_matrix, method = "color", type = "upper", order = "hclust", 
          tl.col = "black", tl.srt = 45) 
 ```
-Podemos ver como el balance y el número de productos están bastante relacionados, de manera inversa, cuanto menos dinero, más productos, además la edad está bastante relacionada con que un cliente abandone el banco. 
+
+Podemos ver como el balance y el número de productos están bastante relacionados, de manera inversa, cuanto menos dinero, más productos, además la edad está bastante relacionada con que un cliente abandone el banco.El resto de variables no tienen demasiada relación entre ellas.
 
 Vamos a ver qué nos dice nuestra variable objetivo
 
@@ -287,7 +315,7 @@ train %>%
   scale_fill_manual(values = c("skyblue", "tomato"), name = "Churn Status")
 ```
 
-Vemos como los clientes franceses y los españoles son mucho menos propensos que los alemanes a marcharse del banco
+Vemos como los clientes franceses y los españoles son menos propensos que los alemanes a marcharse del banco
 
 Vamos a intentar contestar las preguntas que nos hicimos al inicio:
 
@@ -304,7 +332,9 @@ ggplot(train, aes(x = factor(churn), y = estimated_salary, fill = factor(churn))
 
 ```
 
-Podemos ver como, a priori, el salario anual no influye en la decisión de abandonar el banco Vamos a comprobarlo con un contraste de hipótesis:
+Podemos ver como, a priori, el salario anual no influye en la decisión de abandonar el banco. Vamos a comprobarlo con un contraste de hipótesis.
+
+Primero vemos si sigue una distribución normal para saber qué test aplicar después.. Para ello utilizamos el test de shapiro:
 
 ```{r distribucion salary}
 train$churn <- as.factor(train$churn)
@@ -392,6 +422,8 @@ ggplot(train, aes(x = factor(churn), y = age, fill = factor(churn))) +
   theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
 ```
 
+Vamos a comprobar si es normal para ver qué test utilizamos:
+
 ```{r distribucion age}
 train %>%
   group_by(churn) %>%
@@ -410,6 +442,7 @@ if (p_value < alpha) {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
+
 Podemos ver como la edad importa a la hora de que un cliente abandone el banco o no, usualmente siendo los clientes mayores los que tienden a abandonar el banco
 
 -   ¿Influye el balance?
@@ -423,6 +456,8 @@ ggplot(train, aes(x = factor(churn), y = balance, fill = factor(churn))) +
   theme_bw() +
   theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
 ```
+
+Vamos a comprobar si es normal para ver qué test utilizamos:
 
 ```{r distribucion balance}
 train %>%
@@ -445,9 +480,12 @@ if (p_value < alpha) {
   print("No podemos rechazar la hipótesis nula. No existe esta diferencia significativa")
 }
 ```
+
 Se observa que cuanto mayor es el balance, mayor es la probabilidad de que el cliente se cambie de banco
 
-## Tecnica de reducción a la dimensión (PCA).
+## Técnicas de reducción a la dimensión (PCA).
+
+### PCA con prcomp
 
 Con el siguiente código veremos cómo afecta el uso del PCA a nuestros datos. Para utilizar PCA únicamente utilizamos los datos continuos de nuestro dataset
 
@@ -484,7 +522,7 @@ print(p2)  # Gráfico de componentes principales
 Ahora los resultados de aplicar el PCA usando el summary para ver el resumen:
 
 ```{r}
-# Resumen del PCA (sin sobrescribir el objeto original)
+# Resumen del PCA 
 pca_summary <- summary(pca)
 print(pca$sdev)
 print(pca$rotation)
@@ -493,15 +531,26 @@ print(pca$scale)
 print(pca_summary)
 ```
 
+Podemos ver que nuestras componentes principales muestran lo siguiente:
+
+-   PC1 es la componente principal más importante, nos muestra un 21% de la información del dataset, explica la mayor parte de la varianza y está relacionada principalmente con el credit score y balance de forma negativa y con el número de productos de forma positiva. Esto quiere decir que los clientes con un mayor número de productos van a ir por un lado, mientras que los que tengan mayor credit score y balance ìrán por el otro.
+
+-   PC2 es la siguiente más importante, nos muestra un 17% de la información y está asociada con la edad de forma negativa y con el salario estimado de forma positiva, por lo que muestra una relación entre la edad y el salario estimado. Esto quiere decir que los clientes mayores irían por un lado, mientras que los que tienen salarios altos irían por el otro.
+
 ```{r}
 prcomp(Data$credit_score)
 ```
 
-Sin usar ninguna función de R para reducir la dimensionalidad lo haremos de la siguiente manera: 1er paso: Realizaremos la normal de nuestro conjunto de datos:
+### PCA manual
+
+Sin usar ninguna función de R para reducir la dimensionalidad lo haremos de la siguiente manera: 
+
+1er paso: Realizaremos la normal de nuestro conjunto de datos, los escalamos y los centramos:
 
 ```{r}
 set.seed(1234)
 
+# tomamos los datos continuos
 data_cont <- train[, c("credit_score", "age", "tenure", "balance", "products_number", "estimated_salary")]
 data_cont <- na.omit(data_cont)
 
@@ -509,6 +558,7 @@ X_data <- as.matrix(data_cont)
 
 # Calculamos las medias de cada columna.
 medias_data <- colMeans(X_data)
+
 # Calculamos la desviación típica de cada columna.
 desv_data <- apply(X_data,2,sd)
 
@@ -537,13 +587,14 @@ autovectores <- eig$vectors
 print(autovectores)
 print(autovalores)
 ```
+
 Podemos ver como el resultado es el mismo que aplicando la función prcomp
 
 ## Aprendizaje no supervisado
 
-### Clustering no jerárquico
+Vamos a ver cómo se agrupan los clientes en base a una serie de parámetros, para ello vamos a utilizar clustering, tanto jerárquico como no jerárquico.
 
-Vamos a ver cómo se agrupan los clientes en base a una serie de parámetros, para ello vamos a utilizar clustering
+### Matriz de distancias
 
 En primer lugar vamos a calcular la distancia Euclídea entre las observaciones de la base de datos. También mostraremos la matriz de distancias.
 
@@ -579,6 +630,8 @@ A partir de esto, podemos observar como se cumplen las condiciones para ser una 
 -   No negatividad: el valor más bajo de nuestra matriz de distancias es 0
 
 -   Simetría: con el gráfico podemos ver como la matriz es simétrica respecto al eje formado por x = y
+
+### Clustering no jerárquico
 
 Para empezar, podemos aplicar el algoritmo de las k-medias con k = 2, luego iremos ajustando el número de clusters para llegar al óptimo
 
@@ -620,7 +673,9 @@ fviz_cluster(k4, data = datos_escalados, geom = "point")
 k4
 
 ```
-Del plot de los clusters podemos ver como este numero de clusters no es ideal, ya que se mezclan demasiado entre ellos, sin haber una diferenciación clara entre clusters. 
+
+Del plot de los clusters podemos ver como este numero de clusters no es ideal, ya que se mezclan demasiado entre ellos, sin haber una diferenciación clara entre clusters.
+
 ```{r}
 set.seed(595)
 table(k_medias$cluster, k4$cluster)
@@ -663,7 +718,7 @@ print(gap, method = "firstmax")
 fviz_gap_stat(gap)
 ```
 
-Parece ser que el número óptimo de clusters según este método es 1, algo que no tiene demasiado sentido.
+Parece ser que el número óptimo de clusters según este método es 1, algo que no tiene demasiado sentido, ya que nos interesa clasificar los datos en distintos grupos, no solo en 1.
 
 ```{r}
 k1 <-  kmeans(datos_escalados, centers = 1, iter.max = 10, nstart = 25)
@@ -677,7 +732,13 @@ Esquema de agrupación a partir de los diferentes resultados obtenidos variando 
 # de nuevo para facilitar el procesamiento utilizamos una muestra del dataset
  nb <-  NbClust(sampled_data, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
 ```
-Las dos primeras gráficas me indican que, a más clusters, mejor es la estadística de Hubert y mejor es el ajuste de los clusters, además nos dice que el mejor número de clusters respecto a dicha estadística es 3 y que a partir de 4 ya deja de tener sentido hacer más clusters. A pesar de esto, como hemos podido ver con los 4 clusters, perdemos mucha explicabilidad, ya que se empiezan a mezclar los clusters, por lo que, aunque respecto a la estadística de Hubert es lo más apropiado, puede no ser el número óptimo de clusters. Las siguientes dos gráficas nos dicen lo siguiente: El primero nos dice que según la métrica de la silueta, a más clusters, peor, como hemos podido observar anteriormente. La última nos dice que el mejor número de clusters en este sentido es 2 y que a partir de ahí, el clustering empieza a ser peor. 
+
+Las dos primeras gráficas me indican que, a más clusters, mejor es la estadística de Hubert y mejor es el ajuste de los clusters, además nos dice que el mejor número de clusters respecto a dicha estadística es 3 y que a partir de 4 ya deja de tener sentido hacer más clusters. A pesar de esto, como hemos podido ver con los 4 clusters, perdemos mucha explicabilidad, ya que se empiezan a mezclar los clusters, por lo que, aunque respecto a la estadística de Hubert es lo más apropiado, puede no ser el número óptimo de clusters. Las siguientes dos gráficas nos dicen lo siguiente:
+
+-   El primero nos dice que según la métrica de la silueta, a más clusters, peor, como hemos podido observar anteriormente.
+
+-   La última nos dice que el mejor número de clusters en este sentido es 2 y que a partir de ahí, el clustering empieza a ser peor.
+
 ```{r}
 n_clust <-  n_clusters(as.data.frame(sampled_data), 
                        package = c("easystarts", "NbClust", "mclust"),
@@ -688,6 +749,7 @@ n_clust
 ```{r}
 plot(n_clust)
 ```
+
 Esta función, que compara el número de clusters óptimo obtenido mediante varios métodos, nos dice claramente que el mejor número es 3.
 
 ```{r}
@@ -696,6 +758,7 @@ k3 <-  kmeans(datos_escalados, centers = 3, iter.max = 10, nstart = 25)
 
 fviz_cluster(k3, data = datos_escalados, geom = "point")
 ```
+
 Podemos ver como hay tres conjuntos relativamente bien diferenciados. Hay solapamiento ya que nuestras dos primeras componentes principales no muestran demasiada información del dataset. Tendríamos que representarlo en más dimensiones para poder verlo mejor
 
 ```{r}
@@ -709,10 +772,9 @@ Podemos interpretar esta tabla de diferenciación de las medias de la siguiente 
 
 -   El primer cluster es de la gente que lleva menos tiempo en el banco, pero que tiene mucho dinero metido en el y tienen el mejor credit score
 
--   El segundo es gente que lleva más tiempo que los anteriores en el banco, ganan más o menos lo mismo que los anteriores, pero su balance es mucho menor. También     son los que más productos tienen del banco. Su credit score es intermedio
+-   El segundo es gente que lleva más tiempo que los anteriores en el banco, ganan más o menos lo mismo que los anteriores, pero su balance es mucho menor. También son los que más productos tienen del banco. Su credit score es intermedio
 
--   Por último, el tercer cluster se compone de la gente que más tiempo lleva en el banco, más dinero tiene y más gana, pero con el menor credit score. 
-
+-   Por último, el tercer cluster se compone de la gente que más tiempo lleva en el banco, más dinero tiene y más gana, pero con el menor credit score.
 
 ```{r}
 res_kmeans <-  cluster_analysis(datos_escalados, 
@@ -721,9 +783,12 @@ res_kmeans <-  cluster_analysis(datos_escalados,
 
 plot(summary(res_kmeans))
 ```
-Este análisis del cluster confirma nuestras conclusiones extraídas de la tabla de diferenciación. 
 
-A continuación vamos a probar con k-medioides en vez de con k-medias. Primeramente utilizamos el metodo pam, con distancia manhattan en vez de la distancia euclídea
+Este análisis del cluster confirma nuestras conclusiones extraídas de la tabla de diferenciación.
+
+A continuación vamos a probar con k-medioides en vez de con k-medias.
+
+Primeramente utilizamos el metodo pam, con distancia manhattan en vez de la distancia euclídea
 
 ```{r}
 set.seed(100)
@@ -735,8 +800,8 @@ fviz_cluster(object = pam_cluster, data = datos_escalados, ellipse = TRUE,
   theme_bw() +
   labs(title = "Resultados clustering PAM") + theme(legend.position = "none")
 ```
-Podemos ver que no es un método idóneo, ya que hay mucho solapamiento entre clusters. 
-Vamos a probar con el método de los clara clusters
+
+Podemos ver que no es un método idóneo, ya que hay mucho solapamiento entre clusters. Vamos a probar con el método de los clara clusters
 
 ```{r}
 set.seed(100)
@@ -744,6 +809,8 @@ clara_clusters <- clara(x = datos_escalados, k = 3, metric = "manhattan", stand 
                         samples = 50, pamLike = TRUE)
 clara_clusters
 ```
+
+Visualizamos:
 
 ```{r}
 set.seed(100)
@@ -754,13 +821,13 @@ fviz_cluster(object = clara_clusters, ellipse.type = "t", geom = "point",
   theme(legend.position = "none")
 ```
 
-Podemos ver como es bastante más parecido al resultado obtenido con k-means, aunque aquí se puede ver como solamente toma una muestra del dataset completo. 
+Podemos ver como es bastante más parecido al resultado obtenido con k-means, aunque aquí se puede ver como solamente toma una muestra del dataset completo.
 
 ### Clustering jerárquico
 
-Después de haber hecho clustering no jerárquico con k-medias y k-medioides, obteniendo resultados similares, vamos a aplicar métodos de clustering jerárquico. 
+Después de haber hecho clustering no jerárquico con k-medias y k-medioides, obteniendo resultados similares, vamos a aplicar métodos de clustering jerárquico.
 
-Vamos a empezar por el clustering jerárquico algomerativo, para ello vamos a evaluar todos los métodos para ver cual es el que mejor coeficiente de agrupamiento nos da. 
+Vamos a empezar por el clustering jerárquico algomerativo, para ello vamos a evaluar todos los métodos para ver cual es el que mejor coeficiente de agrupamiento nos da.
 
 ```{r}
 set.seed(100)
@@ -774,17 +841,19 @@ ac <- function(x) {
 
 map_dbl(m, ac)
 ```
-Podemos ver como el método Ward nos dá el mayor coeficiente de agrupamiento. 
-Dado el gran número de observaciones que tenemos, elaborar un dendograma no tiene ningún sentido, ya que no solo sería ilegible, sino que también su coste computacional sería demasiado alto.
+
+Podemos ver como el método Ward nos dá el mayor coeficiente de agrupamiento. Dado el gran número de observaciones que tenemos, elaborar un dendograma no tiene ningún sentido, ya que no solo sería ilegible, sino que también su coste computacional sería muy alto.
 
 ```{r}
 hc1 <- hclust(distance, method = "ward.D2")
 hc1
 ```
 
+Hacemos como con el clústering no jerárquico, primeramente visualizamos 2 clusters y luego veremos el número idóneo de clusters con diferentes métodos.
+
 ```{r}
 set.seed(100)
-clusters <- cutree(hc1, k = 2) #Ejemplo con 2 clusters
+clusters <- cutree(hc1, k = 2)
 pca_df <- as.data.frame(pca$x[, 1:2]) 
 
 pca_df$cluster <- as.factor(clusters)
@@ -796,38 +865,47 @@ ggplot(pca_df, aes(x = PC1, y = PC2, color = cluster)) +
 
 ```
 
-Vamos a hacer el clustering jerárquico divisivo
+Vamos a hacer el clustering jerárquico divisivo para ver el número de clusters
 
 ```{r}
 hc2 <- diana(sampled_data)
 hc2$dc
 ```
+
+Vamos a visualizar un dendrograma, aunque no nos será muy útil:
+
 ```{r}
 pltree(hc2, cex = 0.6, hang = -1, main = "Dendrogram de DIANA")
 ```
-Como ya habíamos dicho antes, hacer un dendograma no tiene mucho sentido ya que, al tener tantas observaciones, no se ve demasiado, lo que si podemos ver es que si cortamos a una altura de 6 nos quedan 4 clusters medianamente bien diferenciados. Vamos a aplicar mejor los métodos que aplicamos en clustering no jerárquico para ver el número óptimo de clusters. 
 
-Primeramente el método del codo: 
+Como ya habíamos dicho antes, hacer un dendograma no tiene mucho sentido ya que, al tener tantas observaciones, no se ve demasiado, lo que si podemos ver es que si cortamos a una altura de 6 nos quedan 4 clusters medianamente bien diferenciados. Vamos a aplicar mejor los métodos que aplicamos en clustering no jerárquico para ver el número óptimo de clusters.
+
+Primeramente el método del codo:
+
 ```{r}
 fviz_nbclust(datos_escalados, FUN = hcut, method = "wss")
 ```
 
 Podemos ver como aquí el número óptimo de clusters parece ser 4
 
-Vamos a aplicar el método gap, para ello vamos a utilizar una muestra del dataset: 
+Vamos a aplicar el método gap, para ello vamos a utilizar una muestra del dataset:
+
 ```{r}
+set.seed(100)
 gap_stat <- clusGap(sampled_data, FUN = hcut, nstart = 25, K.max = 10, B = 50)
 fviz_gap_stat(gap_stat)
 ```
-Como nos pasaba en el clustering no jerárquico, también nos dice que el número óptimo es 2 clusters
+
+Como nos pasaba en el clustering no jerárquico, también nos dice que el número óptimo es 1 cluster, algo que no nos sirve, vamos a ver otros métodos como el NbClust:
 
 ```{r}
  nb2 <-  NbClust(sampled_data, distance = "euclidean", min.nc = 2, max.nc = 10, method = "ward.D2")
 ```
 
-Según esto, nuestro número ideal de clusters es 2 o 3, como podemos ver en las gráficas. 
+Según este método, nuestro número ideal de clusters es 2 o 3, como podemos ver en las gráficas.
 
 A continuación vamos a utilizar n_clusters con NbClust únicamente, ya que es el paquete que más se centra en clustering jerárquico
+
 ```{r}
 n_clust2 <-  n_clusters(as.data.frame(sampled_data), 
                        package = c("NbClust"),
@@ -835,7 +913,8 @@ n_clust2 <-  n_clusters(as.data.frame(sampled_data),
 n_clust2
 plot(n_clust2)
 ```
-Podemos ver como nos indica que el número idóneo de clusters es 3. 
+
+Podemos ver como nos indica que el número idóneo de clusters es 3.
 
 Por ello, vamos a cortar en 3 clusters nuestros datos
 
@@ -846,16 +925,21 @@ hc3 <- hclust(distance, method = "ward.D2" )
 sub_grp <- cutree(hc3, k = 3)
 table(sub_grp)
 ```
-Visualizamos nuestros clusters: 
+
+De aqui podemos extraer que el segundo cluster contiene bastantes más puntos que los otros dos.
+
+Vamos a visualizar nuestros clusters:
+
 ```{r}
 set.seed(100)
 fviz_cluster(list(data=datos_escalados,cluster=sub_grp), geom = "point")
 ```
-A pesar de ser 3 clusters, el resultado es diferente al que obtuvimos en el clustering no jerárquico, vamos a ver qué nos dicen estos clusters. 
+
+A pesar de ser 3 clusters igual que en el clustering no jerárquico, el resultado es diferente al que obtuvimos en este, vamos a ver qué nos dicen estos clusters.
 
 ```{r}
 cluster_means <- datos_escalados %>%
-  as.data.frame() %>%  # Ensure it's a data frame
+  as.data.frame() %>%  
   mutate(clusters = sub_grp) %>%
   group_by(clusters) %>%
   summarise_all(mean)
@@ -864,13 +948,30 @@ print(cluster_means)
 
 ```
 
-Podemos ver como ahora los clusters se dividen de la siguiente manera: 
+Podemos ver como ahora los clusters se dividen de la siguiente manera:
 
 -   El primer cluster está compuesto por la gente que tiene un credit score ligeramente más alto, son un poco más jovenes que la media, tienen muchos productos y bastante dinero en el banco.
 
--   El segundo contiene a gente algo más mayor, con un credit score promedio, un balance alto en el banco, pero utilizan menos productos. 
+-   El segundo contiene a gente algo más mayor, con un credit score promedio, un balance alto en el banco, pero utilizan menos productos.
 
--   Por último, el tercero está compuesto por aquellos que son ligeramente más jóvenes que la media, tienen un credit score más bajo, un balance considerablemente más bajo y utilizan menos productos del banco. 
+-   Por último, el tercero está compuesto por aquellos que son ligeramente más jóvenes que la media, tienen un credit score más bajo, un balance considerablemente más bajo y utilizan menos productos del banco.
 
 ## Conclusiones
+
+Eda
+
+En cuanto al PCA, nuestras dos primeras componentes principales nos muestran solamente un 40% aproximado de la información, por lo todos nuestros clusters, independientemente del método que utilicemos, se van a ver solapados, ya que no tienen mucha cantidad de información del dataset. Si visualizáramos en más dimensiones quedaría más clara la separación de los clusters. 
+
+También en relación con el PCA, estamos utilizando solamente las variables continuas, por lo que como  nuestro dataset tiene bastantes variables binarias, asi como dos variables categóricas, estamos perdiendo información que podría ser valiosa a la hora de clasificar nuestros datos en diferentes clusters. Para ello deberíamos utlizar otros métodos como el escalado multidimensional o algún otro tipo de selección de variables, algo que sería interesante implementar de cara al aprendizaje supervisado, para poder predecir con toda la información de nuestro dataset si una persona se irá o no del banco.
+
+También para reducir la dimensionalidad podríamos utilizar los mapas auto-organizados, que utilizando clustering nos podrían ayudar a hacer una selección de variables aún más precisa.
+
+Asimismo, nuestra matriz de distancias está computada con las distancias euclídeas entre nuestros datos contínuos, ganaríamos más precisión si creáramos nosotros una matriz de distancias teniendo en cuenta estas variables binarias también, además de las variables categóricas. 
+
+En cuanto a los distintos métodos de clustering, tanto para clustering jerárquico como no jerárquico, vemos que el número de clusters es igual, a pesar de eso, los clusters que obtenemos mediante los métodos jerárquicos y no jerárquicos. Con k-means y k-medioides con el método clara tenemos un resultado bastante similar y con los métodos jerárquicos y el método PAM tenemos resultados también similares, pero diferentes a los anteriores. Estos resultados se diferencian entre si por el criterio que utilizan a la hora de separar los valores. Mientras que el clustering jerárquico separa los puntos por edad, credit score, balance y productos, siendo bastante importantes a la hora de diferenciar los conjuntos el número de productos, el balance y el credit score; el clustering no jerárquico da mayor importancia a al tiempo que llevan los clientes en el banco (tenure), el balance de las cuentas y el credit score. 
+
+Estos grupos pueden servir después para ver qué grupo es más probable que abandone el banco en algún momento en base al grupo al que pertenezca, esto lo podremos hacer con los métodos de aprendizaje supervisado que veremos más adelante en la asignatura, con los que podremos predecir esto
+
+
+
 
