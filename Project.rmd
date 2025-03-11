@@ -65,6 +65,7 @@ library(factoextra)
 library(cluster)
 library("NbClust")
 library(parameters)
+library(tidyverse)
 ```
 
 Leemos los datos
@@ -531,6 +532,8 @@ Podemos ver como el resultado es el mismo que aplicando la función prcomp
 
 ### Clustering no jerárquico
 
+Vamos a ver cómo se agrupan los clientes en base a una serie de parámetros, para ello vamos a utilizar clustering
+
 En primer lugar vamos a calcular la distancia Euclídea entre las observaciones de la base de datos. También mostraremos la matriz de distancias.
 
 ```{r}
@@ -552,10 +555,8 @@ print(as.matrix(distance)[1:5, 1:5])
 tamaño_muestra <- floor(0.1 * nrow(datos_escalados))
 sampled_data <- datos_escalados[sample(seq_len(nrow(datos_escalados)), size = tamaño_muestra), ]
 
-# Calculate the distance matrix on the sampled data
 distance_matrix_sampled <- get_dist(sampled_data, method = "euclidean")
 
-# Visualize the distance matrix
 fviz_dist(distance_matrix_sampled) 
 
 ```
@@ -727,12 +728,14 @@ Podemos ver que no es un método idóneo, ya que hay mucho solapamiento entre cl
 Vamos a probar con el método de los clara clusters
 
 ```{r}
+set.seed(100)
 clara_clusters <- clara(x = datos_escalados, k = 3, metric = "manhattan", stand = TRUE,
                         samples = 50, pamLike = TRUE)
 clara_clusters
 ```
 
 ```{r}
+set.seed(100)
 fviz_cluster(object = clara_clusters, ellipse.type = "t", geom = "point",
              pointsize = 2.5) +
   theme_bw() +
@@ -746,5 +749,117 @@ Podemos ver como es bastante más parecido al resultado obtenido con k-means, au
 
 Después de haber hecho clustering no jerárquico con k-medias y k-medioides, obteniendo resultados similares, vamos a aplicar métodos de clustering jerárquico. 
 
+Vamos a empezar por el clustering jerárquico algomerativo, para ello vamos a evaluar todos los métodos para ver cual es el que mejor coeficiente de agrupamiento nos da. 
 
+```{r}
+set.seed(100)
+m <- c( "average", "single", "complete", "ward")
+names(m) <- c( "average", "single", "complete", "ward")
+
+# Calculamos el coeficiente de agrupamiento de todos los métodos
+ac <- function(x) {
+  agnes(sampled_data, method = x)$ac
+}
+
+map_dbl(m, ac)
+```
+Podemos ver como el método Ward nos dá el mayor coeficiente de agrupamiento. 
+Dado el gran número de observaciones que tenemos, elaborar un dendograma no tiene ningún sentido, ya que no solo sería ilegible, sino que también su coste computacional sería demasiado alto.
+
+```{r}
+hc1 <- hclust(distance, method = "ward.D2")
+hc1
+```
+
+```{r}
+set.seed(100)
+clusters <- cutree(hc1, k = 2) #Ejemplo con 2 clusters
+pca_df <- as.data.frame(pca$x[, 1:2]) 
+
+pca_df$cluster <- as.factor(clusters)
+
+# Hacemos un scatter plot para visualizar los clusters. 
+ggplot(pca_df, aes(x = PC1, y = PC2, color = cluster)) + 
+  geom_point() +
+  labs(title = "Scatter Plot of Clusters", x = "PC1", y = "PC2")
+
+```
+
+Vamos a hacer el clustering jerárquico divisivo
+
+```{r}
+hc2 <- diana(sampled_data)
+hc2$dc
+```
+```{r}
+pltree(hc2, cex = 0.6, hang = -1, main = "Dendrogram de DIANA")
+```
+Como ya habíamos dicho antes, hacer un dendograma no tiene mucho sentido ya que, al tener tantas observaciones, no se ve demasiado, lo que si podemos ver es que si cortamos a una altura de 6 nos quedan 4 clusters medianamente bien diferenciados. Vamos a aplicar mejor los métodos que aplicamos en clustering no jerárquico para ver el número óptimo de clusters. 
+
+Primeramente el método del codo: 
+```{r}
+fviz_nbclust(datos_escalados, FUN = hcut, method = "wss")
+```
+
+Podemos ver como aquí el número óptimo de clusters parece ser 4
+
+Vamos a aplicar el método gap, para ello vamos a utilizar una muestra del dataset: 
+```{r}
+gap_stat <- clusGap(sampled_data, FUN = hcut, nstart = 25, K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+```
+Como nos pasaba en el clustering no jerárquico, también nos dice que el número óptimo es 1 cluster
+
+```{r}
+ nb2 <-  NbClust(sampled_data, distance = "euclidean", min.nc = 2, max.nc = 10, method = "ward.D2")
+```
+
+Según esto, nuestro número ideal de clusters es 2, como podemos ver en las gráficas. 
+
+A continuación vamos a utilizar n_clusters con NbClust únicamente, ya que es el paquete que más se centra en clustering jerárquico
+```{r}
+n_clust2 <-  n_clusters(as.data.frame(sampled_data), 
+                       package = c("NbClust"),
+                       standardize = FALSE)
+n_clust2
+plot(n_clust2)
+```
+Podemos ver como nos indica que el número idóneo de clusters es 3. 
+
+Por ello, vamos a cortar en 3 clusters nuestros datos
+
+```{r}
+set.seed(100)
+hc3 <- hclust(distance, method = "ward.D2" )
+
+sub_grp <- cutree(hc3, k = 3)
+table(sub_grp)
+```
+Visualizamos nuestros clusters: 
+```{r}
+set.seed(100)
+fviz_cluster(list(data=datos_escalados,cluster=sub_grp))
+```
+A pesar de ser 3 clusters, el resultado es diferente al que obtuvimos en el clustering no jerárquico, vamos a ver qué nos dicen estos clusters. 
+
+```{r}
+cluster_means <- datos_escalados %>%
+  as.data.frame() %>%  # Ensure it's a data frame
+  mutate(clusters = sub_grp) %>%
+  group_by(clusters) %>%
+  summarise_all(mean)
+
+print(cluster_means)
+
+```
+
+Podemos ver como ahora los clusters se dividen de la siguiente manera: 
+
+-   El primer cluster está compuesto por la gente que tiene un credit score ligeramente más alto, son un poco más jovenes que la media, tienen muchos productos y bastante dinero en el banco.
+
+-   El segundo contiene a gente algo más mayor, con un credit score promedio, un balance alto en el banco, pero utilizan menos productos. 
+
+-   Por último, el tercero está compuesto por aquellos que son ligeramente más jóvenes que la media, tienen un credit score más bajo, un balance considerablemente más bajo y utilizan menos productos del banco. 
+
+## Conclusiones
 
