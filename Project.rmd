@@ -66,6 +66,7 @@ library(cluster)
 library("NbClust")
 library(parameters)
 library(tidyverse)
+library(corrplot)
 ```
 
 Leemos los datos
@@ -229,6 +230,16 @@ ggplot(train, aes(x = estimated_salary, y = credit_score)) +
 ```
 
 Podemos ver como siguen distribuciones bastante normales, con la excepción de los datos con valor 0 del balance, que como hay muchos, tienen mucho peso.
+
+Hacemos una matriz de correlación para ver como están relacionadas nuestras variables: 
+
+```{r}
+train_filtered <- train %>% select(-country, -gender)
+correlation_matrix <- cor(train_filtered)
+corrplot(correlation_matrix, method = "color", type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45) 
+```
+Podemos ver como el balance y el número de productos están bastante relacionados, de manera inversa, cuanto menos dinero, más productos, además la edad está bastante relacionada con que un cliente abandone el banco. 
 
 Vamos a ver qué nos dice nuestra variable objetivo
 
@@ -586,7 +597,7 @@ k_medias
 Visualización de los clusters
 
 ```{r}
-fviz_cluster(k_medias, data = datos_escalados)
+fviz_cluster(k_medias, data = datos_escalados, geom = "point")
 ```
 
 Vamos a realizar los 3 métodos más populares para determinar el número óptimo de clústeres:
@@ -605,7 +616,7 @@ En este análisis, a partir de 4 clusters, la reducción en la suma total de cua
 set.seed(595)
 k4 <- kmeans(datos_escalados, centers = 4, nstart = 25)
 
-fviz_cluster(k4, data = datos_escalados)
+fviz_cluster(k4, data = datos_escalados, geom = "point")
 k4
 
 ```
@@ -657,7 +668,7 @@ Parece ser que el número óptimo de clusters según este método es 1, algo que
 ```{r}
 k1 <-  kmeans(datos_escalados, centers = 1, iter.max = 10, nstart = 25)
 
-fviz_cluster(k1, data = datos_escalados)
+fviz_cluster(k1, data = datos_escalados, geom = "point")
 ```
 
 Esquema de agrupación a partir de los diferentes resultados obtenidos variando todas las combinaciones de clústeres, medias de distancia y métodos de agrupación
@@ -683,7 +694,7 @@ Esta función, que compara el número de clusters óptimo obtenido mediante vari
 set.seed(100)
 k3 <-  kmeans(datos_escalados, centers = 3, iter.max = 10, nstart = 25)
 
-fviz_cluster(k3, data = datos_escalados)
+fviz_cluster(k3, data = datos_escalados, geom = "point")
 ```
 Podemos ver como hay tres conjuntos relativamente bien diferenciados. Hay solapamiento ya que nuestras dos primeras componentes principales no muestran demasiada información del dataset. Tendríamos que representarlo en más dimensiones para poder verlo mejor
 
@@ -808,13 +819,13 @@ Vamos a aplicar el método gap, para ello vamos a utilizar una muestra del datas
 gap_stat <- clusGap(sampled_data, FUN = hcut, nstart = 25, K.max = 10, B = 50)
 fviz_gap_stat(gap_stat)
 ```
-Como nos pasaba en el clustering no jerárquico, también nos dice que el número óptimo es 1 cluster
+Como nos pasaba en el clustering no jerárquico, también nos dice que el número óptimo es 2 clusters
 
 ```{r}
  nb2 <-  NbClust(sampled_data, distance = "euclidean", min.nc = 2, max.nc = 10, method = "ward.D2")
 ```
 
-Según esto, nuestro número ideal de clusters es 2, como podemos ver en las gráficas. 
+Según esto, nuestro número ideal de clusters es 2 o 3, como podemos ver en las gráficas. 
 
 A continuación vamos a utilizar n_clusters con NbClust únicamente, ya que es el paquete que más se centra en clustering jerárquico
 ```{r}
@@ -838,7 +849,7 @@ table(sub_grp)
 Visualizamos nuestros clusters: 
 ```{r}
 set.seed(100)
-fviz_cluster(list(data=datos_escalados,cluster=sub_grp))
+fviz_cluster(list(data=datos_escalados,cluster=sub_grp), geom = "point")
 ```
 A pesar de ser 3 clusters, el resultado es diferente al que obtuvimos en el clustering no jerárquico, vamos a ver qué nos dicen estos clusters. 
 
