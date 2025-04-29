@@ -1,0 +1,569 @@
+---
+title: "Proyecto_parte2"
+author: "Gonzalo Cruz Gómez"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    theme: flatly # Tema
+    code_folding: hide
+    number_sections: yes
+---
+
+```{r setup, include=FALSE}
+# --- Global Setup ---
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+
+# Cargamos las librerías 
+library(tidyverse)     # Manipulación de datos y gráficos
+library(data.table)    # Lectura rápida de datos
+library(knitr)         # Tablas (kable)
+library(caret)         # Workflow ML (división, preproc, entrenamiento, evaluación)
+library(pROC)          # Análisis Curva ROC
+library(gbm)           # Gradient Boosting Machine (GBM)
+library(xgboost)       # XGBoost
+library(adabag)        # AdaBoost (M1)
+library(rpart)       # Necesario para adabag/AdaBoost.M1 default control
+library(ggplot2)
+# Cargamos las funciones manuales
+source("adaboost_manual.R")
+source("knn_manual.R")
+```
+
+# 1. Introducción y Objetivos
+
+La fuga de clientes, o *churn*, representa un desafío significativo para las empresas en diversos sectores, incluido el bancario. Identificar a los clientes con alta probabilidad de abandonar la entidad permite implementar estrategias de retención proactivas, optimizando recursos y manteniendo la base de clientes.
+
+Este informe aborda el problema de la predicción de fuga de clientes utilizando un conjunto de datos bancarios (`Bank Customer Churn Prediction.csv`). El **objetivo principal** es desarrollar, evaluar y comparar modelos de clasificación basados en dos familias de algoritmos distintas: **k-Nearest Neighbors (k-NN)** y **Boosting**.
+
+Los **objetivos específicos** son:
+
+1.  **Implementar manualmente** los algoritmos k-NN (incluyendo la búsqueda del hiperparámetro 'k') y AdaBoost (utilizando stumps de decisión como clasificadores débiles).
+2.  **Entrenar versiones de librería** de k-NN y de varios algoritmos de Boosting (Gradient Boosting Machine - GBM, XGBoost, y AdaBoost.M1) utilizando el paquete `caret` para un flujo de trabajo estandarizado y optimización de hiperparámetros.
+3.  **Realizar un preprocesamiento adecuado** de los datos, considerando las necesidades específicas de cada algoritmo (manejo de variables categóricas, escalado).
+4.  **Evaluar y comparar exhaustivamente** el rendimiento de todas las implementaciones (manuales y de librería) sobre un conjunto de prueba independiente, utilizando métricas relevantes para clasificación binaria con clases desbalanceadas (AUC, Sensitivity, Specificity, F1-Score, Accuracy).
+5.  **Seleccionar el modelo más performante** entre los evaluados, basándose en los criterios de rendimiento definidos.
+6.  **Extraer conclusiones** sobre la efectividad relativa de k-NN vs. Boosting para este problema, las diferencias entre implementaciones manuales y de librería, y las variables predictoras más influyentes.
+7.  **Proponer líneas de trabajo futuro** para mejorar la predicción de fuga de clientes.
+
+Este análisis busca no solo encontrar un modelo predictivo eficaz, sino también profundizar en la comprensión práctica de los algoritmos implementados y las consideraciones necesarias al aplicar aprendizaje automático a problemas de negocio reales.
+
+# 2. Carga y Preprocesamiento de Datos
+
+## 2.1. Carga y Preparación Inicial
+
+```{r cargar datos}
+# Cargar datos
+file_path <- "Bank Customer Churn Prediction.csv"
+bank_data <- data.table::fread(file_path) %>% tibble::as_tibble()
+```
+
+## 2.2. División Train/Test
+
+Se mantienen los datos con factores para los modelos de `caret`.
+
+```{r split train-test}
+set.seed(42) # Semilla para reproducibilidad
+train_index <- createDataPartition(bank_data$churn, p = 0.8, list = FALSE, times = 1)
+train_data <- bank_data[train_index, ]
+test_data <- bank_data[-train_index, ]
+
+cat("Dimensiones - Train Data:", dim(train_data), "\n")
+cat("Dimensiones - Test Data:", dim(test_data), "\n")
+```
+
+# 3. K-NN
+
+## 3.1. k-NN Manual
+
+```{r k-nn manual}
+
+```
+
+## 3.2. k-NN
+Vamos a aplicar ahora el algoritmo de k vecinos más cercanos (k-nn). Para la elección de k utilizaremos cross validation con 10 folds. Con esta k entrenaremos el modelo k-nn en nuestro dataset de entrenamiento para luego aplicarlo a nuestros datos de test y ver cómo de bueno es prediciendo. 
+
+```{r k-nn}
+# Convertimos churn a factor
+train_data$churn <- as.factor(train_data$churn)
+levels(train_data$churn) <- make.names(levels(train_data$churn))
+# Hacemos cross validation para elegir la k
+set.seed(42)
+train_control <- trainControl(method = "cv", number = 10, classProbs = TRUE, summaryFunction = twoClassSummary)
+# Entrenamos el modelo con los datos de entrenamiento utilizando accuracy como nuestra métrica
+modelo_knn <- train(
+  churn ~ ., data = train_data, method = "knn",
+  trControl = train_control, metric = "Accuracy",
+  preProcess = c("center", "scale"), 
+  tuneLength = 10
+)
+
+cat("Resultados k-NN\n"); print(modelo_knn)
+cat("Mejor k:", modelo_knn$bestTune$k, "\n")
+plot(modelo_knn, main = "Rendimiento k-NN según la elección de k")
+summary(modelo_knn)
+```
+Vemos como el número ideal de vecinos es 23, lo hemos elegido ya que es el que tiene mayor ROC 
+
+Ahora vamos a ver como funciona el algoritmo en nuestros datos de entrenamiento, para ello vamos a utilizar la matriz de confusión y vamos a analizar las distintas métricas que podemos extraer de ahí
+```{r k-nn train}
+# Hacemos la predicción con nuestros datos de train
+prediction <- predict(modelo_knn, newdata = train_data)
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+cf <- confusionMatrix(
+    data = prediction,                    
+    reference = train_data$churn,        
+    positive = levels(train_data$churn)[2]          
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+```
+Tenemos una buena accuracy, de un 84%, pero esto puede llevarnos a confusión, ya que nuestros datos están ciertamente desbalanceados (tenemos muchos más datos de clientes que no se van del banco que clientes que si que lo hacen). Es por ello que debemos fijarnos en otras métricas. 
+Lo desbalanceado de los datos también se ve en el test de Mcnemar, el cual hace el ratio entre FP y FN. Al ser tan pequeño, nos demuestra que nuestros datos están muy desbalanceados y que hacemos muchos más fallos al predecir positivos que negativos. 
+Nuestro algoritmo de K-nn es bueno prediciendo cuando un cliente se va a quedar en el banco, esto lo vemos con la NIR, que es de un 79% y con la especificidad, que es de un 98%, con lo que predecimos bien un 98% de los casos de clientes que se quedan. En cambio, nuestra Recall (sensitivity) es demasiado baja, no predecimos correctamente los positivos. Como el modelo falla en aproximadamente un 75% de las predicciones de clientes que se van del banco, no lo podemos considerar un buen modelo para nuestros datos.
+A pesar de ello, tenemos buena precisión en las predicciones, ya que cuando predice que un cliente se va a ir, en un 78% de las ocasiones se marcha del banco. 
+En conclusión, el modelo de k-nn es mejor que el azar, pero falla significativamente a la hora de predecir cuando un cliente se va del banco como nos muestra la sensitivity. Deberemos probar otros algoritmos de clasificación que harán nuestras predicciones mejores.
+
+Vamos a comprobarlo en el dataset de test
+```{r k-nn test}
+# Nos aseguramos de que el churn es un factor
+test_data$churn <- as.factor(test_data$churn)
+levels(test_data$churn) <- make.names(levels(test_data$churn))
+
+prediction <- predict(modelo_knn, newdata = test_data)
+
+cat("Primeras predicciones:", paste(head(prediction), collapse=", "), "\n")
+cat("Primeros valores reales:", paste(head(test_data$churn), collapse=", "), "\n")
+
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+cf <- confusionMatrix(
+    data = prediction,                      
+    reference = test_data$churn,        
+    positive = levels(test_data$churn)[2]           
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+```
+Vemos como todo lo mencionado en las predicciones de train aplica aqui como es lógico. 
+# 4. Análisis discriminante lineal
+Como nuestros datos no siguen una distribución normal, no podremos aplicarlo a nuestros datos, es por ello que solamente vamos a aplicarlo de manera manual con unos datos que cumplen las condiciones necesarias
+## 4.1 Análisis discriminante lineal manual
+
+# 5. Árboles de decisión
+
+# 6. Bagging
+## 6.1 Bagging manual
+
+## 6.2 Bagging 
+
+# 7. Boosting
+## 7.1 Adaboost manual
+
+```{r adaboost_manual}
+
+```
+
+## 7.2 Boosting 
+Vamos a aplicar a continuación distintos modelos de boosting, estos modelos deberían mejorar el rendimiento de nuestras predicciones, así como ayudarnos a reducir el sesgo y el desequilibrio de nuestros datos (que como hemos podido observar en algunos modelos esto es bastante importante para nosotros). A pesar de estas ventajas, la aplicación de modelos de boosting reduce la interpretabilidad de nuestras predicciones, además de complicarnos el ajuste de los hiperparámetros
+
+Primeramente vamos a implementar AdaBoost
+
+### Adaboost
+Este modelo es interesante ya que sigue siendo un modelo aditivo, pero como utiliza la pérdida exponencial, reduce la influencia de los ejemplos mal clasificados y como le da más peso a aquellas iteraciones que más difíciles han sido de clasificar, nos garantiza que el modelo final es robusto. 
+```{r adaboost}
+set.seed(128)
+# Utilizamos validación cruzada para hallar los hiperparámetros
+trainControl_adaboost <- trainControl(
+    method = "repeatedcv",
+    number = 10,       # 10 folds
+    repeats = 3,       # 3 veces
+    verboseIter = FALSE 
+)
+
+ada_grid <- expand.grid(
+    mfinal = 50,      # numero de arboles
+    maxdepth = c(2,3),         # profundidad de los árboles
+    coeflearn = c('Breiman', 'Freund') # coeficiente de aprendizaje
+    )
+
+model_adaboost <- train(
+  churn ~ .,                     # utilizamos todas las características para predecir el churn
+  data = train_data,         
+  method = "AdaBoost.M1",        
+  trControl = trainControl_adaboost, 
+  metric = "Accuracy",          
+  tuneGrid = ada_grid,          
+  preProcess = c("center", "scale") 
+)
+
+cat("\nResultados del entrenamiento\n")
+print(model_adaboost)
+cat("\nMejores hiperparámetros:\n")
+print(model_adaboost$bestTune)
+
+# Representamos el rendimiento en base a los mejores hiperparámetros
+plot(model_adaboost)
+summary(model_adaboost)
+```
+
+Hacemos la predicción primeramente con nuestros datos de entrenamiento para ver como predice nuestro modelo. Para ello vamos a utilizar la matriz de confusión
+```{r adaboost train}
+set.seed(123)
+prediction <- predict(model_adaboost, newdata = train_data)
+
+cat("Primeras predicciones:", paste(head(prediction), collapse=", "), "\n")
+cat("Primeros valores reales:", paste(head(train_data$churn), collapse=", "), "\n")
+
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+positive_class_label <- levels(train_data$churn)[2] 
+cf <- confusionMatrix(
+    data = prediction,                      
+    reference = train_data$churn,        
+    positive = positive_class_label           
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+
+prediction_prob_train <- try(predict(model_adaboost, newdata = train_data, type = "prob"))
+current_levels <- levels(train_data$churn)
+
+roc_curve_adaboost_train <- roc(
+        response = train_data$churn,
+        predictor = prediction_prob_train[[positive_class_label]],
+        levels = current_levels,
+        quiet = TRUE
+        )
+
+# Plot the ROC curve
+plot(roc_curve_adaboost_train,
+         print.auc = TRUE,
+         main = "Curva ROC del modelo AdaBoost (Training)",
+         legacy.axes = TRUE
+         )
+```
+Podemos ver como este modelo tiene una accuracy de un 86% lo cual es bastante bueno, aunque debemos indagar más en el resto de métricas para ver si realmente nuestras predicciones son buenas. 
+El índice Kappa es mejor que en otros modelos, cerca del 50%, aunque sigue siendo bajo. El test McNemar nos sigue mostrando este desbalance en nuestros datos, el modelo sigue prediciendo mejor aquellos que no se van, que aquellos que si lo hacen. 
+Siguiendo esta línea, nuestro recall e de solo un 48%, lo cual sigue siendo bajo, ya que significa que predecimos mal la mitad de aquellos que se marchan. 
+La especificidad es alta, asi como el NPV, ya que predecimos bien los negativos, con cerca de un 96% de las predicciones siendo correctas. 
+Por último. comparando AUC y sensitividad podemos extraer que el threshold de 0.5 para la AUC no es el ideal en nuestro caso, ya que si eligieramos otro threshold, tendríamos una sensitividad más alta a expensas de tener una especificidad y precisión más bajas, algo que nos podría llegar a interesar puesto que nuestro objetivo es que los clientes no se vayan del banco.
+
+A continuación lo aplicamos en los datos de test
+```{r adaboost test}
+prediction <- predict(model_adaboost, newdata = test_data)
+
+cat("Primeras predicciones:", paste(head(prediction), collapse=", "), "\n")
+cat("Primeros valores reales:", paste(head(test_data$churn), collapse=", "), "\n")
+
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+cf <- confusionMatrix(
+    data = prediction,                      
+    reference = test_data$churn,        
+    positive = levels(test_data$churn)[2]           
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+
+prediction_prob_train <- try(predict(model_adaboost, newdata = test_data, type = "prob"))
+current_levels <- levels(test_data$churn)
+
+roc_curve_adaboost_test <- roc(
+        response = test_data$churn,
+        predictor = prediction_prob_train[[positive_class_label]],
+        levels = current_levels,
+        quiet = TRUE
+        )
+
+# Plot the ROC curve
+plot(roc_curve_adaboost_test,
+         print.auc = TRUE,
+         main = "Curva ROC del modelo AdaBoost (test)",
+         legacy.axes = TRUE
+         )
+```
+Vemos como todo lo dicho anteriormente para los datos de entrenamiento aplica de nuevo a nuestros datos de test. 
+
+Vamos a ver qué ocurre cuando aplicamos otros algoritmos de boosting como Gradient Boosting: 
+
+### Gradient boosting
+
+```{r gbm}
+set.seed(128) # para reproducibilidad
+# Usaremos validación cruzada repetida
+trainControl_gbm <- trainControl(
+    method = "repeatedcv",
+    number = 10,        # 10 folds
+    repeats = 3,        # 3 repeticiones
+    verboseIter = FALSE, 
+    classProbs = TRUE,
+    summaryFunction = twoClassSummary
+)
+
+gbm_grid <- expand.grid(
+    n.trees = 100, # numero de arboles
+    interaction.depth = c(1, 2, 3), # profundidad 
+    shrinkage = c(0.1, 0.05), # tasa de aprendizaje
+    n.minobsinnode = c(10, 15) # minimo de observaciones en el ultimo nodo
+    )
+
+model_gbm <- train(
+  churn ~ .,
+  data = train_data,
+  method = "gbm", 
+  trControl = trainControl_gbm, 
+  metric = "Accuracy",
+  tuneGrid = gbm_grid,
+  preProcess = c("center", "scale"), 
+  verbose = FALSE
+)
+cat("Resultados del entrenamiento\n")
+print(model_gbm)
+cat("\nMejores hiperparámetros:\n")
+print(model_gbm$bestTune)
+
+# Representamos el modelo y sus métricas
+plot(model_gbm)
+cat("\nImportancia de las variables:\n")
+gbm_importancia <- varImp(model_gbm, scale = FALSE)
+plot(gbm_importancia) # Visualizamos la importancia de cada variable en el modelo
+
+```
+
+```{r gbm train}
+prediction <- predict(model_gbm, newdata = train_data)
+
+cat("Primeras predicciones:", paste(head(prediction), collapse=", "), "\n")
+cat("Primeros valores reales:", paste(head(train_data$churn), collapse=", "), "\n")
+
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+positive_class_label <- levels(train_data$churn)[2] 
+cf <- confusionMatrix(
+    data = prediction,                      
+    reference = train_data$churn,        
+    positive = positive_class_label           
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+
+prediction_prob_train <- try(predict(model_gbm, newdata = train_data, type = "prob"))
+current_levels <- levels(train_data$churn)
+
+roc_curve_gbm_train <- roc(
+        response = train_data$churn,
+        predictor = prediction_prob_train[[positive_class_label]],
+        levels = current_levels,
+        quiet = TRUE
+        )
+
+# Plot the ROC curve
+plot(roc_curve_gbm_train,
+         print.auc = TRUE,
+         main = "Curva ROC del modelo GBM (Training)",
+         legacy.axes = TRUE
+         )
+```
+En este caso, nuestra sensitivity aumenta ligeramente, igual que lo hace la accuracy. Estos aumentos no son significativos por lo que podemos decir que el modelo predice de igual manera que el anterior. Sin embargo, lo que si ganamos significativamente es tiempo. El modelo Adaboost es mucho más lento que el modelo GBM, por lo que, al hacer ambos predicciones similares, sería más eficiente elegir el gradient boosting para nuestro problema. 
+
+Vamos a ver qué ocurre en los datos de test, aunque obviamente esperamos un resultado similar
+
+```{r gbm test}
+prediction <- predict(model_gbm, newdata = test_data)
+
+cat("Primeras predicciones:", paste(head(prediction), collapse=", "), "\n")
+cat("Primeros valores reales:", paste(head(test_data$churn), collapse=", "), "\n")
+
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+positive_class_label <- levels(test_data$churn)[2] 
+cf <- confusionMatrix(
+    data = prediction,                      
+    reference = test_data$churn,        
+    positive = positive_class_label           
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+
+prediction_prob_test <- try(predict(model_gbm, newdata = test_data, type = "prob"))
+current_levels <- levels(test_data$churn)
+
+roc_curve_gbm_test <- roc(
+        response = test_data$churn,
+        predictor = prediction_prob_test[[positive_class_label]],
+        levels = current_levels,
+        quiet = TRUE
+        )
+
+# Plot the ROC curve
+plot(roc_curve_gbm_test,
+         print.auc = TRUE,
+         main = "Curva ROC del modelo GBM (Test)",
+         legacy.axes = TRUE
+         )
+```
+Como imaginabamos, los resultados son muy similares al train, por lo que no hay sobreajuste
+
+Por último vamos a implementar el modelo XGBoost o extreme gradient boosting, el cual nos debería dar mejor resultado, no solo prediciendo, sino también en eficiencia.
+
+### XGBoost
+
+```{r}
+set.seed(128)
+trainControl_xgb_roc <- trainControl(
+    method = "repeatedcv",
+    number = 10,    
+    repeats = 3,
+    classProbs = TRUE, 
+    summaryFunction = twoClassSummary, 
+    verboseIter = FALSE, 
+    allowParallel = TRUE,
+    sampling = "up"
+)
+xgb_grid <- expand.grid(
+    nrounds = 100,
+    max_depth = c(3, 6), # Profundidad máxima del árbol
+    eta = c(0.05, 0.1), # Tasa de aprendizaje
+    gamma = c(0.1, 0.2), # Tasa de regularización
+    colsample_bytree = c(0.7), # Fracción de columnas por árbol 
+    min_child_weight = c(1, 3), # Peso mínimo por cada nodo hijo
+    subsample = c(0.7) # Fracción de muestras por árbol
+)
+# imprimimos los hiperparámetros del modelo
+print(xgb_grid)
+
+model_xgboost <- train(
+  churn ~ .,
+  data = train_data,
+  method = "xgbTree",
+  trControl = trainControl_xgb_roc,
+  metric = "ROC",
+  tuneGrid = xgb_grid,
+  preProcess = c("center", "scale"),
+  verbose = FALSE
+)
+
+print(model_xgboost)
+# Representaciones
+xgb_importancia <- varImp(model_xgboost, scale = FALSE)
+print(xgb_importancia)
+plot(xgb_importancia) # Para visualizar la importancia
+
+```
+
+Vamos a ver cómo funciona el modelo en nuestros datos de entrenamiento
+```{r}
+prediction <- predict(model_xgboost, newdata = train_data)
+
+cat("Primeras predicciones:", paste(head(prediction), collapse=", "), "\n")
+cat("Primeros valores reales:", paste(head(train_data$churn), collapse=", "), "\n")
+
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+positive_class_label <- levels(train_data$churn)[2] 
+cf <- confusionMatrix(
+    data = prediction,                      
+    reference = train_data$churn,        
+    positive = positive_class_label           
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+
+prediction_prob_train <- try(predict(model_xgboost, newdata = train_data, type = "prob"))
+current_levels <- levels(train_data$churn)
+
+roc_curve_xgboost_train <- roc(
+        response = train_data$churn,
+        predictor = prediction_prob_train[[positive_class_label]],
+        levels = current_levels,
+        quiet = TRUE
+        )
+
+# Plot the ROC curve
+plot(roc_curve_xgboost_train,
+         print.auc = TRUE,
+         main = "Curva ROC del modelo XGBoost (Training)",
+         legacy.axes = TRUE
+         )
+```
+Tenemos un área bajo la curva (AUC) muy buena, por lo que el modelo diferencia muy bien entre positivos y negativos. En cuanto a las medidas de la matriz de confusión, en este modelo hemos perdido accuracy (sobre un 4%) pero ahora predecimos mucho mejor los TP y FN, nuestra recall es mucho mejor, pasando de un 50% aprox en otros modelos a un 76% en este, con lo que vemos que este modelo es mucho mejor prediciendo a los clientes que se van del banco. Como conseguimos mucha mejor recall, nuestra especificidad baja significativamente a un 83%, lo cual todavía es bastante bueno, pero predecimos peor a los que no se marchan. Todo esto nos lleva a una tasa mayor de falsos positivos, ya que ahora predecimos más casos de churn. A pesar de ello, mejoramos el NPV con lo que cuando predecimos un no, es más probable que sea cierto. 
+
+En este caso, este modelo es mucho mejor si damos mayor importancia a identificar a aquellos que se quieren marchar sobre identificar a aquellos que se quedan
+
+Vamos a ver si estos resultados se transfieren a nuestros datos de test o si hay overfitting
+```{r}
+set.seed(123)
+prediction <- predict(model_xgboost, newdata = test_data)
+
+cat("Primeras predicciones:", paste(head(prediction), collapse=", "), "\n")
+cat("Primeros valores reales:", paste(head(test_data$churn), collapse=", "), "\n")
+
+# Calculamos la matriz de confusión
+# Como nosotros queremos predecir si un cliente se va o no del banco, elegimos aquellos que sí se van como nuestro positivo
+positive_class_label <- levels(test_data$churn)[2] 
+cf <- confusionMatrix(
+    data = prediction,                      
+    reference = test_data$churn,        
+    positive = positive_class_label           
+    )
+
+# Imprimimos la matriz de confusión y sus métricas
+print(cf)
+
+prediction_prob_test <- try(predict(model_xgboost, newdata = test_data, type = "prob"))
+current_levels <- levels(test_data$churn)
+
+roc_curve_xgboost_test <- roc(
+        response = test_data$churn,
+        predictor = prediction_prob_test[[positive_class_label]],
+        levels = current_levels,
+        quiet = TRUE
+        )
+
+# Plot the ROC curve
+plot(roc_curve_xgboost_test,
+         print.auc = TRUE,
+         main = "Curva ROC del modelo XGBoost (Test)",
+         legacy.axes = TRUE
+         )
+```
+Como podemos ver, los resultados son muy similares en test por lo que no tenemos overfitting y nuestro modelo es robusto. 
+
+# 8. Naïve bayes
+## 8.1. Naïve bayes manual
+
+## 8.2. Naïve bayes
+
+# 9. Evaluación y Comparación de Modelos
+
+Evaluamos todos los modelos en el conjunto de prueba.
+
+## 9.1. Predicciones en el Conjunto de Prueba
+
+
+## 9.2. Cálculo de Métricas y Tabla Comparativa
+
+
+# 10. Conclusiones y Trabajo Futuro
+
+## 10.1. Elección del Modelo Final
+
+
+## 10.2. Análisis del Modelo Seleccionado
+
+
+## 10.3. Conclusiones 
+
+
+## 10.4. Trabajo Futuro
+
