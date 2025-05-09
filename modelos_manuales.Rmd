@@ -1,0 +1,287 @@
+---
+title: "modelos_manuales"
+author: "Gonzalo Cruz Gómez"
+date: "2025-05-08"
+output: html_document
+---
+
+Vamos a implementar los diferentes modelos pedidos a mano desde cero para después compararlos con sus contrapartes ya implementadas en R 
+
+# Análisis discriminante lineal
+
+# K-NN
+
+```{r}
+# Función KNN a mano
+knn_manual <- function(train_data, train_labels, test_data, k) {
+  num_test_samples <- nrow(test_data)
+  predicciones <- character(num_test_samples)
+  
+  for (i in 1:num_test_samples) {
+    fila_prueba <- test_data[i, ]
+    distancias <- numeric(nrow(train_data))
+    
+    # Calculamos la distancia euclídea a cada punto del conjunto de entrenamiento
+    for (j in 1:nrow(train_data)) {
+      fila_entrenamiento <- train_data[j, ]
+      distancias[j] <- sqrt(sum((fila_entrenamiento - fila_prueba)^2))
+    }
+    
+    # Combinamos distancias con las etiquetas
+    distancia_etiquetas <- data.frame(distancia = distancias, etiqueta = train_labels)
+    
+    # Ordenamos por distancia
+    distancia_etiquetas_ordenada <- distancia_etiquetas[order(distancia_etiquetas$distancia), ]
+    
+    # Obtenemps las etiquetas de los k vecinos más cercanos
+    etiquetas_vecinos_cercanos <- as.character(distancia_etiquetas_ordenada$etiqueta[1:k])
+    
+    # Predecimos la clase
+    tabla_vecinos <- table(etiquetas_vecinos_cercanos)
+    clase_predicha <- names(tabla_vecinos)[which.max(tabla_vecinos)]
+    predicciones[i] <- clase_predicha
+  }
+  return(predicciones)
+}
+
+# Vamos a ejecutarlo y compararlo con el modelo de R. Para ello usaremos los datos de la libreria iris
+library(datasets)
+data(iris)
+
+# Preparamos los datos
+set.seed(123)
+indices <- sample(1:nrow(iris), 0.7 * nrow(iris))
+train_data_iris <- iris[indices, 1:4]
+train_labels_iris <- iris[indices, 5]
+test_data_iris <- iris[-indices, 1:4]
+test_labels_iris <- iris[-indices, 5]
+
+k_value_iris <- 5
+
+# Predicciones del KNN manual en los datos de prueba
+predicciones_manual_iris <- knn_manual(
+  train_data_iris,
+  train_labels_iris,
+  test_data_iris,
+  k_value_iris
+)
+accuracy_manual_iris <- mean(predicciones_manual_iris == as.character(test_labels_iris))
+cat("Accuracy del KNN manual en datos Iris:", accuracy_manual_iris, "\n")
+
+library(class)
+
+predicciones_r_iris <- knn(
+  train = train_data_iris,
+  test = test_data_iris,
+  cl = train_labels_iris,
+  k = k_value_iris
+)
+accuracy_r_iris <- mean(predicciones_r_iris == test_labels_iris)
+cat("Accuracy del KNN de r:", accuracy_r_iris, "\n")
+
+cat("Comparativa de las primeras 10 predicciones:\n")
+comparativa_knn_iris <- data.frame(
+  Manual = predicciones_manual_iris,
+  R_class = as.character(predicciones_r_iris),
+  Real = as.character(test_labels_iris)
+)
+print(head(comparativa_knn_iris, 10))
+
+cat("Comparativa de accuracy:\n")
+cat("Accuracy modelo a mano:", accuracy_manual_iris, "\n")
+cat("Accuracy R:", accuracy_r_iris, "\n")
+```
+Predicen igualmente bien ambos modelos, esto es por la simplicidad del modelo k-nn
+
+# Bagging
+
+```{r}
+
+```
+
+# Adaboost
+```{r}
+# Cargamos las librerías
+library(rpart)
+library(caret)
+library(adabag)
+
+# Función para el modelo AdaBoost manual
+adaboost_manual <- function(X, y, n_estimators = 5) {
+  n_samples <- nrow(X)
+  weights <- rep(1/n_samples, n_samples)
+  classifiers <- list()
+  alpha <- numeric(n_estimators)
+
+  # Almacenamos los niveles originales de y 
+  levels_y <- levels(y)
+
+  for (m in 1:n_estimators) {
+    base_classifier <- rpart(y ~ ., data = data.frame(X, y = y), weights = weights, maxdepth = 1)
+    # Predecimos en los datos de entrenamiento para calcular el error
+    predictions <- predict(base_classifier, newdata = data.frame(X), type = "class")
+    # Guardamos el clasificador
+    classifiers[[m]] <- base_classifier
+    # Calculamos el error
+    incorrect <- (predictions != y)
+    error_m <- sum(weights[incorrect]) / sum(weights)
+
+    # Evitamos log0 y log1
+    if (error_m <= 1e-10) { 
+      error_m <- 1e-10
+    } else if (error_m >= 1 - 1e-10) { 
+      error_m <- 1 - 1e-10
+    }
+
+    # Calculamos el peso del clasificador
+    alpha[m] <- 0.5 * log((1 - error_m) / error_m)
+
+    # Actualizamos y normalizamos los pesos
+    weights <- weights * exp(alpha[m] * (as.numeric(incorrect) * 2 - 1))
+    weights <- weights / sum(weights)
+  }
+
+  # Devolvemos la lista de clasificadores, sus pesos y los niveles originales
+  return(list(classifiers = classifiers, alpha = alpha, levels_y = levels_y))
+}
+
+# Función para hacer las predicciones del modelo manual
+predict_adaboost_manual <- function(model, X) {
+  n_estimators <- length(model$classifiers)
+  votes <- matrix(0, nrow = nrow(X), ncol = n_estimators)
+  levels_y_train <- model$levels_y
+
+  level_map <- c(-1, 1)
+  names(level_map) <- levels_y_train
+
+  for (m in 1:n_estimators) {
+    base_classifier <- model$classifiers[[m]]
+    # Predecimos la clase para cada dato en los datos de prueba
+    pred_class <- predict(base_classifier, newdata = data.frame(X), type = "class")
+    votes[, m] <- level_map[pred_class]
+  }
+
+  # Combinamos los votos ponderados por los alfas
+  final_scores <- rowSums(votes * model$alpha)
+
+  # Nuestra predicción final es el signo de la suma de scores ponderados
+  predicted_levels_numeric <- ifelse(final_scores > 0, 1, -1)
+
+  # Mapeamos el resultado numérico (-1 o 1) a los niveles originales
+  final_prediction_factor <- factor(ifelse(predicted_levels_numeric == 1, levels_y_train[2], levels_y_train[1]), levels = levels_y_train)
+
+  return(final_prediction_factor)
+}
+
+# Vamos a probar y a comparar los dos modelos, el nuestro y el de R
+# Generamos unos datos dummy
+set.seed(123) 
+data <- mlbench.spirals(n = 100, cycles = 1, sd = 0.1)
+X <- as.data.frame(data$x)
+y_factor <- factor(data$classes) 
+
+# Hacemos division train test
+set.seed(42)
+train_indices <- sample(1:nrow(X), 0.7 * nrow(X))
+X_train <- X[train_indices, ]
+y_train_factor <- y_factor[train_indices]
+X_test <- X[-train_indices, ]
+y_test_factor <- y_factor[-train_indices]
+
+# Entrenamos nuestro modelo y hacemos predicciones
+modelo_adaboost_manual <- adaboost_manual(X_train, y_train_factor, n_estimators = 10) # Aumentamos estimadores
+y_pred_manual <- predict_adaboost_manual(modelo_adaboost_manual, X_test)
+
+# Entrenamos el modelo de r
+train_data <- data.frame(X_train, Class = y_train_factor)
+train_data$Class <- factor(train_data$Class, levels = levels(y_factor))
+
+test_data <- data.frame(X_test)
+
+# Configuramos los hiperparámetros del modelo con adaboost
+adaboost_grid <- expand.grid(mfinal = 10,
+                             maxdepth = 1, 
+                             coeflearn = "Breiman") 
+
+modelo_adaboost <- train(Class ~ .,
+                        data = train_data,
+                        method = "AdaBoost.M1",
+                        tuneGrid = adaboost_grid, 
+                        metric = "Accuracy" 
+                        )
+
+predicciones_adaboost <- predict(modelo_adaboost, newdata = test_data)
+
+# Calculamos las métricas para poder comparar los modelos
+cat("\nMétricas para el modelo adaboost desde cero:\n")
+y_pred_manual <- factor(y_pred_manual, levels = levels(y_test_factor))
+confusionMatrix_manual <- confusionMatrix(y_pred_manual, y_test_factor)
+print(confusionMatrix_manual)
+
+cat("\nMétricas para el modelo AdaBoost con R:\n")
+predictions_adaboost <- factor(predictions_adaboost, levels = levels(y_test_factor))
+confusionMatrix_adaboost <- confusionMatrix(predicciones_adaboost, y_test_factor)
+print(confusionMatrix_adaboost)
+
+```
+
+Podemos ver que nuestro modelo es algo peor que el de R. Esto se debe a que no ajustamos los hiperparámetros tanto como lo hacemos cuando utilizamos la funcion del paquete adabag. Particularmente tenemos mucha perdida en especificidad, accuracy y neg pred value. También el valor de kappa es mucho menor.
+
+# Naive bayes
+
+```{r}
+
+# 1. Entrenar: prior y likelihoods con Laplace smoothing
+prior <- prop.table(table(train_data_base$churn))
+
+likelihoods <- list()
+for (var in names(train_data_base)[names(train_data_base) != "churn"]) {
+  tab <- table(train_data_base[[var]], train_data_base$churn)
+  tab <- tab + 1 # Laplace smoothing
+  likelihoods[[var]] <- prop.table(tab, margin = 2)
+}
+
+# 2. Función para predecir Naive Bayes
+predict_naive_bayes <- function(newdata, prior, likelihoods) {
+  probs <- matrix(1, nrow = nrow(newdata), ncol = length(prior))
+  colnames(probs) <- names(prior)
+  
+  for (var in names(newdata)) {
+    var_levels <- rownames(likelihoods[[var]])  # Niveles conocidos en entrenamiento
+    for (class in names(prior)) {
+      probs_tmp <- rep(1e-6, nrow(newdata))  # Inicializar probabilidad mínima
+      known_mask <- newdata[[var]] %in% var_levels
+      if (any(known_mask)) {
+        probs_tmp[known_mask] <- likelihoods[[var]][as.character(newdata[[var]][known_mask]), class]
+      }
+      probs[,class] <- probs[,class] * probs_tmp
+    }
+  }
+  
+  # Multiplicar por prior
+  for (class in names(prior)) {
+    probs[,class] <- probs[,class] * prior[class]
+  }
+  
+  # Normalizar filas
+  probs <- probs / rowSums(probs)
+  
+  return(probs)
+}
+
+# 3. Predicción
+probs_test <- predict_naive_bayes(test_data[,-9], prior, likelihoods)
+
+# 4. Clasificación
+predicted_class <- ifelse(probs_test[,"1"] > 0.5, 1, 0)
+
+# 5. Evaluación
+cf_manual_nb <- confusionMatrix(
+  factor(predicted_class, levels = c(0,1)),
+  factor(test_data$churn, levels = c(0,1)),
+  positive = "1"
+)
+
+print(cf_manual_nb)
+```
+

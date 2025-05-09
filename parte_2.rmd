@@ -15,21 +15,17 @@ output:
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
 
 # Cargamos las librerías 
-library(tidyverse)     # Manipulación de datos y gráficos
-library(data.table)    # Lectura rápida de datos
-library(knitr)         # Tablas (kable)
-library(caret)         # Workflow ML (división, preproc, entrenamiento, evaluación)
-library(pROC)          # Análisis Curva ROC
-library(gbm)           # Gradient Boosting Machine (GBM)
-library(xgboost)       # XGBoost
-library(adabag)        # AdaBoost (M1)
-library(rpart)       # Necesario para adabag/AdaBoost.M1 default control
+library(tidyverse)
+library(data.table)
+library(knitr)
+library(caret)
+library(pROC)
+library(gbm)
+library(xgboost)
+library(adabag)
+library(rpart)
 library(ggplot2)
 library(randomForest)
-
-
-source("adaboost_manual.R")
-source("knn_manual.R")
 ```
 # Indice
 -   Introducción
@@ -69,260 +65,8 @@ cat("Dimensiones - Test Data:", dim(test_data), "\n")
 
 # 3. Regresión logística
 
-##CODIGO JORGE, ESTROPEA EL K-NN
-
-Estudiamos la influencia de active_member en churn
-```{r}
-tabla1 <- xtabs(~active_member+churn, data = train_data)
-tabla1
-```
-
-```{r}
-chisq.test(tabla1)
-```
-Podemos ver que existe una relación relevante entre ambas variables ya que es p-valor es claramente menor a 0.05. 
-
-Usamos la regresión logística para cuantificar la relación:
-```{r}
-train_data$factor.churn <- factor(train_data$churn)
-logit1 <- glm(factor.churn ~ active_member, data = train_data, family = "binomial")
-summary(logit1)
-```
-Como vemos la variable active_members tiene alta significatividad en la variable respuesta churn. La estimación es negativa, lo que indica que ser miembro activo disminuye la probabilidad de churn(irse del bank_data).
-
-```{r}
-exp(cbind(OR=coef(logit1), confint.default(logit1)))
-```
-
-Como el OR de active_member es menor que 1, es un factor protector contra el churn. Ser miembro activo del bank_data reduce de forma significativa la probabilidad de que un cliente se dé de baja del bank_data. La odds ratioo de 0.47... indica que las probabilidades de churn se reducen casi a la mitad cuando el cliente es activo.
-
-```{r}
-confint.default(logit1)
-```
-
-
-Ahora vamos a hacer un modelo con cada variable con la variable objetivo churn para ver como se comportan.
-```{r}
-bank_data$gender <- as.factor(bank_data$gender)
-bank_data$country <- as.factor(bank_data$country)
-bank_data$credit_card <- as.factor(bank_data$credit_card)
-bank_data$active_member <- as.factor(bank_data$active_member)
-
-# Lista de nombres como strings
-variables_binomiales <- c("age", "tenure", "credit_score", "country", 
-                          "gender", "balance", "products_number", 
-                          "credit_card", "active_member", "estimated_salary")
-
-
-factor.churn <- factor(bank_data$churn)
-
-# Bucle
-for (var in variables_binomiales) {
-  formula <- as.formula(paste("factor.churn ~", var))
-  modelo <- glm(formula, data = train_data, family = "binomial")
-  
-  cat("\n---------------------------\n")
-  cat("Variable:", var, "\n")
-  print(summary(modelo))  # Resumen del modelo
-  
-  # Mostrar odds ratios e intervalos de confianza
-  cat("Odds Ratio e IC 95%:\n")
-  print(exp(cbind(OR = coef(modelo), confint.default(modelo))))
-}
-
-```
-Interpretación de resultados:
-  
-  Variable: age
-p-value < 2e-16 → altamente significativa
-OR = 1.072 → Por cada año adicional, las odds de abandono (churn) aumentan un 7.2%
-Significativa
-
-Variable: tenure
-p-value = 0.126 → no significativa
-OR = 0.98 → ligera disminución del riesgo con más años, pero no concluyente
-No significativa
-
-Variable: credit_score
-p-value = 0.417 → no significativa
-OR ≈ 1 → efecto mínimo/neutro
-No significativa
-
-Variable: country
-countryGermany: p-value < 2e-16, OR = 2.49 → los clientes alemanes tienen 149% más odds de churn que los de referencia
-countrySpain: p-value = 0.246, OR = 1.11 → no significativa
-Solo countryGermany es significativa
-
-Variable: gender
-p-value < 2e-16, OR = 0.577 → ser hombre reduce las odds de churn en un 42.3%
-Significativa
-
-Variable: balance
-p-value < 2e-16, OR muy cercana a 1 pero significativa → valores altos de balance se asocian positivamente con churn
-Significativa
-
-Variable: products_number
-p-value = 0.006, OR = 0.846 → cada producto extra reduce las odds de churn en un 15.4%
-Significativa
-
-Variable: credit_card
-p-value = 0.206, OR = 0.91 → no significativa
-No significativa
-
-Variable: active_member
-p-value < 2e-16, OR = 0.47 → ser miembro activo reduce las odds de churn un 53%
-Significativa
-
-Variable: estimated_salary
-p-value = 0.493, OR ≈ 1 → sin efecto aparente
-No significativa
-
-Conclusión general:
-  Variables significativas individualmente:
-  
-  age
-
-countryGermany
-
-gender
-
-balance
-
-products_number
-
-active_member
-
-Variables no significativas:
-  
-  tenure
-
-credit_score
-
-countrySpain
-
-credit_card
-
-estimated_salary
-
-A continuación. ajustamos un modelo de regresión logística con todas las carecterísticas significativas.
-```{r}
-modelo2 <- glm(factor.churn ~ age + country + gender + balance + products_number + active_member, data = train_data, family = "binomial")
-summary(modelo2)
-```
-
-En un modelo con todas las variables deja de ser significante la variable de products_number al producirse la interacción con las demás variables
-
-
-```{r}
-table(train_data$factor.churn)
-```
-Esto nos indica que el modelo está sesgado hacia la clase "no".
-
-
-Calculamos la probabilidad que ofrece el modelo para cada una de las observaciones en la muestra de entrenamiento
-```{r}
-predicciones <- predict(modelo2, type="response")
-hist(predicciones)
-```
-En este histograma que hemos creado sobre la distribución de las probabilidades predichas por el modelo de regresión logística que hemos creado con las variables binomiales significantes que hemos creado, vemos que la mayoría de las predicciones están entre 0.1 y 0.2, lo que significa que la mauoría de los clientes tienen baja probabilidad de irse. Además no hay clientes con altas probabilidades de irse.
-
-```{r}
-library(caret)
-
-# Asegura que la variable objetivo sea un factor con los niveles correctos
-train_data$churn <- ifelse(train_data$churn %in% c("yes", "1"), "yes", "no")
-train_data$churn <- factor(train_data$churn, levels = c("no", "yes"))
-
-
-clase.pred <- ifelse(predicciones > 0.5, "yes", "no")
-clase.pred <- factor(clase.pred, levels = c("no", "yes"))
-
-confusionMatrix(data= clase.pred ,reference=train_data$churn ,positive="yes")
-```
-Esta matriz de confusión nos indica los falsos positivos y negativos, igual que los verdaderos positivos y negativos. Nuestro modelo acierta el 81.2% de las veces(Accuracy), aunque el modelo no está prediciendo bien la probabilidad de irse del bank_data(churn = yes) ya que hay más falsos positivos que verdaderos positivos. La sensibilidad nos dice que el modelo solo detecta el 22.6% de los que realmente hacen churn, mientras de los que no hacen churn un 96.5%. 
-
-
-```{r}
-confmat1 <- confusionMatrix(
-  data = clase.pred,
-  reference = factor(train_data$churn, levels = c("no", "yes")),
-  positive = "yes"
-)
-
-# F1 Score real
-Precision <- confmat1$byClass["Pos Pred Value"]
-Recall <- confmat1$byClass["Sensitivity"]
-F1score <- 2 * Precision * Recall / (Precision + Recall)
-names(F1score) <- "F1Score"
-F1score
-
-```
-El F1Score es un indicador de balance entre precisión y recall. Un 0.33 es un balance muy bajo, lo que indica que el modelo no está haciendo un gran trabajo prediciendo quién se va a dar de baja.
-
-Vamos a realizar un balanceo de las clases, lo que ayuda a mejorar la predicción, ya que tenemos un conjunto de datos desequillibrados, para ello hemos eliminado la columna customer_id ya que no aportaba nada de información, hemos convertido la variable gender a tipo factor.
-
-```{r}
-library(ROSE)
-
-# 1. Eliminamos customer_id
-train_data$customer_id <- NULL
-
-# 2. Convertimos gender a factor
-train_data$gender <- as.factor(train_data$gender)
-
-# 4. Aplicamos ROSE (usamos churn como variable objetivo)
-datos_balanceados <- ROSE(churn ~ ., data = train_data, seed = 123)$data
-
-# 5. Confirmamos balanceo
-table(datos_balanceados$churn)
-
-```
-
-Después de aplicar el balanceo con ROSE, las clases ahora están equilibradas, con 2521 para no y 2479 para yes.
-
-```{r}
-library(caret)
-set.seed(42)
-trainIndex <- createDataPartition(datos_balanceados$factor.churn, p = 0.8, list = FALSE)
-train_data_bal <- datos_balanceados[trainIndex, ]
-test_data_bal <- datos_balanceados[-trainIndex, ]
-
-modelo_log <- glm(factor.churn ~ credit_score + gender + age + tenure + balance +
-                    products_number + credit_card + active_member + estimated_salary +
-                    country,
-                  data = train_data_bal, family = "binomial")
-
-predicciones_prob <- predict(modelo_log, test_data_bal, type = "response")
-predicciones <- ifelse(predicciones_prob > 0.5, "1", "0")
-
-predicciones <- factor(predicciones, levels = c("0", "1"))
-reales <- test_data_bal$factor.churn
-
-matriz_confusion <- confusionMatrix(predicciones, reales, positive = "1")
-matriz_confusion
-f1_score <- matriz_confusion$byClass["F1"]
-f1_score
-
-```
-Con los nuevos datos balanceados tenemos un F1Score de 0.71 lo que es mucho mayor y es casi el doble de rendimiento sobre la clase positiva de churn
-
-
-Calculamos la curva ROC.
-```{r}
-library(pROC)
-roc_score=roc(test_data_bal$churn, predicciones_prob,plot=TRUE,print.auc=TRUE)
-```
-
-
 # 4. K-NN
 
-## k-NN Manual
-
-```{r k-nn manual}
-
-```
-
-## k-NN
 Vamos a aplicar ahora el algoritmo de k vecinos más cercanos (k-nn). Para la elección de k utilizaremos cross validation con 10 folds. Con esta k entrenaremos el modelo k-nn en nuestro dataset de entrenamiento para luego aplicarlo a nuestros datos de test y ver cómo de bueno es prediciendo. 
 
 ```{r k-nn}
@@ -397,13 +141,7 @@ Vemos como todo lo mencionado en las predicciones de train aplica aqui como es l
 
 # 5. Análisis discriminante lineal
 
-Como nuestros datos no siguen una distribución normal, no podremos aplicarlo a nuestros datos, es por ello que solamente vamos a aplicarlo de manera manual con unos datos que cumplen las condiciones necesarias
-
-## Análisis discriminante lineal manual
-```{r}
-
-```
-
+Como nuestros datos no siguen una distribución normal como vimos en la primera parte de la práctica, no podremos aplicarlo a nuestros datos, es por ello que solamente vamos a aplicarlo de manera manual con unos datos que cumplen las condiciones necesarias
 
 # 6. Árboles de decisión
 
@@ -479,7 +217,6 @@ ANÁLISIS DEL ÁRBOL DE DECISIÓN: PREDICCIÓN DE CHURN
 
 Usamos el modelo DT para realizar predicciones:
 ```{r}
-# Sobre la partición de entrenamiento
 prediccion_DT <- predict(fit.dt, train_data, type = 'class')
 cf_DT <- confusionMatrix(prediccion_DT, as.factor(datos_DT$churn), positive = "yes")
 
@@ -555,7 +292,7 @@ data <- Data %>%
 
 # 2. Configuración del experimento
 set.seed(123)
-n_reps <- 50  # Reducido para mayor velocidad (aumentar para análisis final)
+n_reps <- 50
 test_size <- 0.2
 
 # Crear conjunto de test
@@ -739,11 +476,7 @@ de ellos sin ser bien detectados.
 
 ```{r}
 plot(rf_full)
-
-# Añadir un título
 title(main = "Error OOB y por Clase - Random Forest")
-
-# Añadir una leyenda
 legend("topright", 
        legend = colnames(rf_full$err.rate), 
        col = 1:ncol(rf_full$err.rate), 
@@ -762,8 +495,7 @@ confusión vista antes, por el otro lado **Clase 1(Churn - Verde)** tiene
 un error considerablemente alto que disminuye lentamente,
 
 ```{r}
-# Partición de prueba
-
+# Partición de test
 # Predecir probabilidades
 prediction.rf <- predict(rf_full, test_data, type = "prob")[,2]
 
@@ -820,13 +552,7 @@ permanecen en ambos gráficos con valores muy pequeños por lo que podrían
 ser variables para considerar para eliminar.
 
 # 8. Boosting
-## Adaboost manual
 
-```{r adaboost_manual}
-
-```
-
-## Boosting 
 Vamos a aplicar a continuación distintos modelos de boosting, estos modelos deberían mejorar el rendimiento de nuestras predicciones, así como ayudarnos a reducir el sesgo y el desequilibrio de nuestros datos (que como hemos podido observar en algunos modelos esto es bastante importante para nosotros). A pesar de estas ventajas, la aplicación de modelos de boosting reduce la interpretabilidad de nuestras predicciones, además de complicarnos el ajuste de los hiperparámetros
 
 Primeramente vamos a implementar AdaBoost
@@ -844,8 +570,8 @@ trainControl_adaboost <- trainControl(
 )
 
 ada_grid <- expand.grid(
-    mfinal = 50,      # numero de arboles
-    maxdepth = c(2,3),         # profundidad de los árboles
+    mfinal = 50, # numero de arboles
+    maxdepth = c(2,3), # profundidad de los árboles
     coeflearn = c('Breiman', 'Freund') # coeficiente de aprendizaje
     )
 
@@ -947,7 +673,7 @@ plot(roc_curve_adaboost_test,
          legacy.axes = TRUE
          )
 ```
-Vemos como todo lo dicho anteriormente para los datos de entrenamiento aplica de nuevo a nuestros datos de test. 
+Vemos como todo lo dicho anteriormente para los datos de entrenamiento aplica de nuevo a nuestros datos de test, por lo que no tenemos sobreajuste.
 
 Vamos a ver qué ocurre cuando aplicamos otros algoritmos de boosting como Gradient Boosting: 
 
@@ -1198,6 +924,8 @@ plot(roc_curve_xgboost_test,
 ```
 Como podemos ver, los resultados son muy similares en test por lo que no tenemos overfitting y nuestro modelo es robusto. 
 
+Dependiendo de lo que prioricemos, si el elegir mejor a aquellos clientes que permanecen el banco o a aquellos que se van a marchar, deberemos elegir un modelo u otro. Esto lo estudiaremos un poco más adelante cuando comparemos los modelos y elijamos un modelo final para nuesto problema.
+
 # 9. Naïve bayes
 ## Naive Bayes
 
@@ -1300,7 +1028,7 @@ cf_manual_nb <- confusionMatrix(
 print(cf_manual_nb)
 ```
 
-A partir de esta respueta podemos sacar kas siguientes conclusiones.
+A partir de esta respueta podemos sacar las siguientes conclusiones.
 
 **Conclusiones del Modelo Naive Bayes**
 
@@ -1350,7 +1078,7 @@ funcion Naive Bayes y haciendo el método de manera manual.
 -   El Kappa es ligeramente mejor en el modelo manual (0.355 vs. 0.324),
     lo que indica mejor acuerdo global con la clase real.
 
-Viendo esto podemos decir que en reneral el modelo hecho de manera
+Viendo esto podemos decir que en general el modelo hecho de manera
 manual es mejor pero veamos en que aspectos específicamente es mejor el
 modelo manual o el modelo hecho con el paquete.
 
