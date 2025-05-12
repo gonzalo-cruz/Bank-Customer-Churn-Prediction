@@ -9,6 +9,9 @@ output:
     theme: flatly # Tema
     code_folding: hide
     number_sections: yes
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -27,9 +30,11 @@ library(rpart)
 library(ggplot2)
 library(randomForest)
 ```
+
 # Indice
+
 -   Introducción
--   Carga de datos 
+-   Carga de datos
 -   Regresión logística (Jorge)
 -   K-nn (Gonzalo)
 -   Análisis discriminante lineal (Jorge)
@@ -41,7 +46,6 @@ library(randomForest)
 -   Conclusiones
 
 # 1. Introducción
-
 
 # 2. Carga de datos
 
@@ -67,7 +71,11 @@ cat("Dimensiones - Test Data:", dim(test_data), "\n")
 
 # 4. K-NN
 
-Vamos a aplicar ahora el algoritmo de k vecinos más cercanos (k-nn). Para la elección de k utilizaremos cross validation con 10 folds. Con esta k entrenaremos el modelo k-nn en nuestro dataset de entrenamiento para luego aplicarlo a nuestros datos de test y ver cómo de bueno es prediciendo. 
+Vamos a aplicar ahora el algoritmo de k vecinos más cercanos (k-nn).
+Para la elección de k utilizaremos cross validation con 10 folds. Con
+esta k entrenaremos el modelo k-nn en nuestro dataset de entrenamiento
+para luego aplicarlo a nuestros datos de test y ver cómo de bueno es
+prediciendo.
 
 ```{r k-nn}
 # Convertimos churn a factor
@@ -91,9 +99,14 @@ cat("Mejor k:", modelo_knn$bestTune$k, "\n")
 plot(modelo_knn, main = "Rendimiento k-NN según la elección de k")
 summary(modelo_knn)
 ```
-Vemos como el número ideal de vecinos es 23, lo hemos elegido ya que es el que tiene mayor ROC 
 
-Ahora vamos a ver como funciona el algoritmo en nuestros datos de entrenamiento, para ello vamos a utilizar la matriz de confusión y vamos a analizar las distintas métricas que podemos extraer de ahí
+Vemos como el número ideal de vecinos es 23, lo hemos elegido ya que es
+el que tiene mayor ROC
+
+Ahora vamos a ver como funciona el algoritmo en nuestros datos de
+entrenamiento, para ello vamos a utilizar la matriz de confusión y vamos
+a analizar las distintas métricas que podemos extraer de ahí
+
 ```{r k-nn train}
 set.seed(123)
 # Hacemos la predicción con nuestros datos de train
@@ -109,13 +122,32 @@ cf <- confusionMatrix(
 # Imprimimos la matriz de confusión y sus métricas
 print(cf)
 ```
-Tenemos una buena accuracy, de un 84%, pero esto puede llevarnos a confusión, ya que nuestros datos están ciertamente desbalanceados (tenemos muchos más datos de clientes que no se van del bank_data que clientes que si que lo hacen). Es por ello que debemos fijarnos en otras métricas. 
-Lo desbalanceado de los datos también se ve en el test de Mcnemar, el cual hace el ratio entre FP y FN. Al ser tan pequeño, nos demuestra que nuestros datos están muy desbalanceados y que hacemos muchos más fallos al predecir positivos que negativos. 
-Nuestro algoritmo de K-nn es bueno prediciendo cuando un cliente se va a quedar en el bank_data, esto lo vemos con la NIR, que es de un 79% y con la especificidad, que es de un 98%, con lo que predecimos bien un 98% de los casos de clientes que se quedan. En cambio, nuestra Recall (sensitivity) es demasiado baja, no predecimos correctamente los positivos. Como el modelo falla en aproximadamente un 75% de las predicciones de clientes que se van del bank_data, no lo podemos considerar un buen modelo para nuestros datos.
-A pesar de ello, tenemos buena precisión en las predicciones, ya que cuando predice que un cliente se va a ir, en un 78% de las ocasiones se marcha del bank_data. 
-En conclusión, el modelo de k-nn es mejor que el azar, pero falla significativamente a la hora de predecir cuando un cliente se va del bank_data como nos muestra la sensitivity. Deberemos probar otros algoritmos de clasificación que harán nuestras predicciones mejores.
+
+Tenemos una buena accuracy, de un 84%, pero esto puede llevarnos a
+confusión, ya que nuestros datos están ciertamente desbalanceados
+(tenemos muchos más datos de clientes que no se van del bank_data que
+clientes que si que lo hacen). Es por ello que debemos fijarnos en otras
+métricas. Lo desbalanceado de los datos también se ve en el test de
+Mcnemar, el cual hace el ratio entre FP y FN. Al ser tan pequeño, nos
+demuestra que nuestros datos están muy desbalanceados y que hacemos
+muchos más fallos al predecir positivos que negativos. Nuestro algoritmo
+de K-nn es bueno prediciendo cuando un cliente se va a quedar en el
+bank_data, esto lo vemos con la NIR, que es de un 79% y con la
+especificidad, que es de un 98%, con lo que predecimos bien un 98% de
+los casos de clientes que se quedan. En cambio, nuestra Recall
+(sensitivity) es demasiado baja, no predecimos correctamente los
+positivos. Como el modelo falla en aproximadamente un 75% de las
+predicciones de clientes que se van del bank_data, no lo podemos
+considerar un buen modelo para nuestros datos. A pesar de ello, tenemos
+buena precisión en las predicciones, ya que cuando predice que un
+cliente se va a ir, en un 78% de las ocasiones se marcha del bank_data.
+En conclusión, el modelo de k-nn es mejor que el azar, pero falla
+significativamente a la hora de predecir cuando un cliente se va del
+bank_data como nos muestra la sensitivity. Deberemos probar otros
+algoritmos de clasificación que harán nuestras predicciones mejores.
 
 Vamos a comprobarlo en el dataset de test
+
 ```{r k-nn test}
 # Nos aseguramos de que el churn es un factor
 test_data$churn <- as.factor(test_data$churn)
@@ -137,15 +169,23 @@ cf <- confusionMatrix(
 # Imprimimos la matriz de confusión y sus métricas
 print(cf)
 ```
-Vemos como todo lo mencionado en las predicciones de train aplica aqui como es lógico.
+
+Vemos como todo lo mencionado en las predicciones de train aplica aqui
+como es lógico.
 
 # 5. Análisis discriminante lineal
 
-Como nuestros datos no siguen una distribución normal como vimos en la primera parte de la práctica, no podremos aplicarlo a nuestros datos, es por ello que solamente vamos a aplicarlo de manera manual con unos datos que cumplen las condiciones necesarias
+Como nuestros datos no siguen una distribución normal como vimos en la
+primera parte de la práctica, no podremos aplicarlo a nuestros datos, es
+por ello que solamente vamos a aplicarlo de manera manual con unos datos
+que cumplen las condiciones necesarias
 
 # 6. Árboles de decisión
 
-Vamos a aplicar el método del árbol de decisión (DT) a nuestros datos, en el que hacemos un modelo para predecir la variable churn a partir de otras variables.
+Vamos a aplicar el método del árbol de decisión (DT) a nuestros datos,
+en el que hacemos un modelo para predecir la variable churn a partir de
+otras variables.
+
 ```{r}
 library(rpart)
 library(rpart.plot)
@@ -159,72 +199,82 @@ fit.dt <- rpart(churn~., data = datos_DT, method = 'class')
 rpart.plot(fit.dt, extra = 100)
 
 ```
-El nodo raíz es la condición de age < 41, si la condición es verdadera se sigue por la rama izquierda, si es falsa por la derecha. Cada nodo intermedio tiene su condición.
-Los nodos hojas contienen una predicción "yes" o "no" y el porcentaje de datos en ese nodo que cumplen esa clase. Por ejemplo, el nodo "no" del 51% predice que el cliente no se dará de baja y el 51% de los casos están ahí.
+
+El nodo raíz es la condición de age \< 41, si la condición es verdadera
+se sigue por la rama izquierda, si es falsa por la derecha. Cada nodo
+intermedio tiene su condición. Los nodos hojas contienen una predicción
+"yes" o "no" y el porcentaje de datos en ese nodo que cumplen esa clase.
+Por ejemplo, el nodo "no" del 51% predice que el cliente no se dará de
+baja y el 51% de los casos están ahí.
 
 ANÁLISIS DEL ÁRBOL DE DECISIÓN: PREDICCIÓN DE CHURN
 
-    Raíz del árbol
-    Condición: age < 41
+```         
+Raíz del árbol
+Condición: age < 41
 
-    Si la edad es menor a 41: rama izquierda
+Si la edad es menor a 41: rama izquierda
 
-    Si la edad es 41 o más: rama derecha
+Si la edad es 41 o más: rama derecha
+
+Distribución:
+53% de los casos van hacia 'no churn'
+
+47% hacia 'sí churn'
+
+Rama izquierda (age < 41)
+Condición: products_number < 2.6
+
+Si products_number < 2.6:
+Resultado: 51% no churn, 3% sí churn
+Interpretación: Clientes jóvenes con pocos productos tienden a quedarse.
+
+Si products_number ≥ 2.6:
+Se analiza: balance < 63000
+
+    Si balance < 63000:
+    Resultado: 6% no churn, 3% sí churn
+    Interpretación: Jóvenes con más productos y saldo bajo siguen siendo leales.
+
+    Si balance ≥ 63000:
+    Se analiza: age < 49
+
+        Si age < 49:
+        Resultado: 3% no churn, 3% sí churn
+        Interpretación: Jóvenes con más productos y saldo alto muestran comportamiento mixto.
+
+Rama derecha (age ≥ 41)
+Condición: products_number ≥ 1.7
+
+Si products_number ≥ 1.7:
+Resultado: 29% sí churn
+Interpretación: Clientes mayores con muchos productos tienden a abandonar el servicio.
+
+Si products_number < 1.7:
+Se analiza: products_number < 2.4
+
+    Si products_number < 2.4:
+    Resultado: 5% sí churn
+
+    Si products_number ≥ 2.4:
+    Resultado: 6% sí churn
+    Interpretación: Clientes mayores con menos productos tienen menor probabilidad de churn.
     
-    Distribución:
-    53% de los casos van hacia 'no churn'
-
-    47% hacia 'sí churn'
-
-    Rama izquierda (age < 41)
-    Condición: products_number < 2.6
-
-    Si products_number < 2.6:
-    Resultado: 51% no churn, 3% sí churn
-    Interpretación: Clientes jóvenes con pocos productos tienden a quedarse.
-
-    Si products_number ≥ 2.6:
-    Se analiza: balance < 63000
-
-        Si balance < 63000:
-        Resultado: 6% no churn, 3% sí churn
-        Interpretación: Jóvenes con más productos y saldo bajo siguen siendo leales.
-
-        Si balance ≥ 63000:
-        Se analiza: age < 49
-
-            Si age < 49:
-            Resultado: 3% no churn, 3% sí churn
-            Interpretación: Jóvenes con más productos y saldo alto muestran comportamiento mixto.
-
-    Rama derecha (age ≥ 41)
-    Condición: products_number ≥ 1.7
-
-    Si products_number ≥ 1.7:
-    Resultado: 29% sí churn
-    Interpretación: Clientes mayores con muchos productos tienden a abandonar el servicio.
-
-    Si products_number < 1.7:
-    Se analiza: products_number < 2.4
-
-        Si products_number < 2.4:
-        Resultado: 5% sí churn
-
-        Si products_number ≥ 2.4:
-        Resultado: 6% sí churn
-        Interpretación: Clientes mayores con menos productos tienen menor probabilidad de churn.
-        
+```
 
 Usamos el modelo DT para realizar predicciones:
+
 ```{r}
 prediccion_DT <- predict(fit.dt, train_data, type = 'class')
 cf_DT <- confusionMatrix(prediccion_DT, as.factor(datos_DT$churn), positive = "yes")
 
 print(cf_DT)
 ```
+
 Un rendimiento del 73.83%.
 
 Vamos a implementarlo en el df de test
+
 ```{r}
 # Sobre la partición de prueba
 prediction.dt <- predict(fit.dt, test_data, type = 'prob')[,2]
@@ -234,6 +284,7 @@ cf_DT_prueba <- confusionMatrix(as.factor(clase.pred), as.factor(test_data$churn
 
 print(cf_DT_prueba)
 ```
+
 Un rendimiento casi igual que el de entrenamiento del 73.27%
 
 # 7. Bagging
@@ -471,8 +522,8 @@ se quedan en el bank_data
 **Para clientes que SÍ abandonan (1):** Tenemos 703 clientes
 correctamente clasificados pero 926 que no lo están eso nos da un 56.84%
 de error eso significa que tenemos un modelo que para los clientes que
-se van del bank_data no los detecta de manera correcta con más de la mitad
-de ellos sin ser bien detectados.
+se van del bank_data no los detecta de manera correcta con más de la
+mitad de ellos sin ser bien detectados.
 
 ```{r}
 plot(rf_full)
@@ -547,18 +598,20 @@ varImpPlot(rf_full)
 
 Una vez vemos esto de manera más visual vemos que estas tres variables
 vistas antes son más importantes a la hora de predecir el abandono en
-los bank_datas, por otro lado renemos los valores de gender y country que
-permanecen en ambos gráficos con valores muy pequeños por lo que podrían
-ser variables para considerar para eliminar.
+los bank_datas, por otro lado renemos los valores de gender y country
+que permanecen en ambos gráficos con valores muy pequeños por lo que
+podrían ser variables para considerar para eliminar.
 
 ## Bagging a a mano
+
+Como estabamos teniendo inconvenientes a la hora de ejecutar el bagging
+manualmente con nuestros datos, lo hemos implementado con el dataset -\>
+Iris.
+
 ```{r}
-## Bagging con iris
-# Cargamos las librerías necesarias
 library(randomForest)
 library(caret)
 
-# Usamos el dataset iris
 data(iris)
 
 # Dividimos en entrenamiento (70%) y test (30%)
@@ -567,7 +620,6 @@ train_index <- createDataPartition(iris$Species, p = 0.7, list = FALSE)
 train <- iris[train_index, ]
 test <- iris[-train_index, ]
 
-# Entrenamos el modelo de Bagging
 bagging_model <- randomForest(
   Species ~ ., 
   data = train,
@@ -575,7 +627,6 @@ bagging_model <- randomForest(
   importance = TRUE
 )
 
-# Realizamos predicciones
 bagging_preds <- predict(bagging_model, newdata = test)
 
 # Evaluamos el rendimiento del modelo
@@ -585,25 +636,52 @@ conf_matrix_bagging <- confusionMatrix(
 )
 print(conf_matrix_bagging)
 
-# Mostramos la importancia de variables
 varImpPlot(bagging_model)
 
 ```
 
+| **Categoría** | **Resultado** | **Conclusión** |
+|-------------------|-------------------|------------------------------------|
+| **Precisión global** | 0.9333 | Muy alta precisión general del modelo. |
+| **Intervalo de confianza (95%)** | (0.8173, 0.986) | Alta fiabilidad en el rendimiento estimado. |
+| **Kappa** | 0.9 | Excelente acuerdo entre predicción y realidad (más allá del azar). |
+| **Setosa - Sensibilidad** | 1.000 | El modelo identifica correctamente todos los casos de setosa. |
+| **Setosa - Especificidad** | 1.000 | No hay falsos positivos al predecir setosa. |
+| **Versicolor - Sensibilidad** | 0.9333 | La mayoría de versicolor se identifican correctamente. |
+| **Versicolor - Especificidad** | 0.9333 | Muy pocos falsos positivos para versicolor. |
+| **Virginica - Sensibilidad** | 0.8667 | Buen desempeño, aunque hay algunas confusiones. |
+| **Virginica - Especificidad** | 0.9667 | Casi sin falsos positivos al predecir virginica. |
+| **Variable más importante (Accuracy)** | Petal.Width | Es la que más influye en la precisión del modelo. |
+| **Variable más importante (Gini)** | Petal.Width | Es la que más reduce la impureza en los árboles. |
+| **Variables con menor importancia** | Sepal.Width, Sepal.Length | Aportan poco al modelo, se podrían eliminar sin gran pérdida. |
+| **Clase más fácilmente identificable** | Setosa | Totalmente separable por el modelo. |
+| **Mayor confusión entre clases** | Versicolor y Virginica | Son las más parecidas, el modelo tiende a confundirlas. |
+| **Conclusión general** | Modelo preciso, balanceado y estable | Excelente rendimiento general, buena interpretación y separación de clases. |
 
 ```{r}
 table(bagging_preds)
 ```
 
-
 # 8. Boosting
 
-Vamos a aplicar a continuación distintos modelos de boosting, estos modelos deberían mejorar el rendimiento de nuestras predicciones, así como ayudarnos a reducir el sesgo y el desequilibrio de nuestros datos (que como hemos podido observar en algunos modelos esto es bastante importante para nosotros). A pesar de estas ventajas, la aplicación de modelos de boosting reduce la interpretabilidad de nuestras predicciones, además de complicarnos el ajuste de los hiperparámetros
+Vamos a aplicar a continuación distintos modelos de boosting, estos
+modelos deberían mejorar el rendimiento de nuestras predicciones, así
+como ayudarnos a reducir el sesgo y el desequilibrio de nuestros datos
+(que como hemos podido observar en algunos modelos esto es bastante
+importante para nosotros). A pesar de estas ventajas, la aplicación de
+modelos de boosting reduce la interpretabilidad de nuestras
+predicciones, además de complicarnos el ajuste de los hiperparámetros
 
 Primeramente vamos a implementar AdaBoost
 
 ### Adaboost
-Este modelo es interesante ya que sigue siendo un modelo aditivo, pero como utiliza la pérdida exponencial, reduce la influencia de los ejemplos mal clasificados y como le da más peso a aquellas iteraciones que más difíciles han sido de clasificar, nos garantiza que el modelo final es robusto. 
+
+Este modelo es interesante ya que sigue siendo un modelo aditivo, pero
+como utiliza la pérdida exponencial, reduce la influencia de los
+ejemplos mal clasificados y como le da más peso a aquellas iteraciones
+que más difíciles han sido de clasificar, nos garantiza que el modelo
+final es robusto.
+
 ```{r adaboost}
 set.seed(128)
 # Utilizamos validación cruzada para hallar los hiperparámetros
@@ -640,7 +718,10 @@ plot(model_adaboost)
 summary(model_adaboost)
 ```
 
-Hacemos la predicción primeramente con nuestros datos de entrenamiento para ver como predice nuestro modelo. Para ello vamos a utilizar la matriz de confusión
+Hacemos la predicción primeramente con nuestros datos de entrenamiento
+para ver como predice nuestro modelo. Para ello vamos a utilizar la
+matriz de confusión
+
 ```{r adaboost train}
 set.seed(123)
 prediction <- predict(model_adaboost, newdata = train_data)
@@ -677,13 +758,26 @@ plot(roc_curve_adaboost_train,
          legacy.axes = TRUE
          )
 ```
-Podemos ver como este modelo tiene una accuracy de un 86% lo cual es bastante bueno, aunque debemos indagar más en el resto de métricas para ver si realmente nuestras predicciones son buenas. 
-El índice Kappa es mejor que en otros modelos, cerca del 50%, aunque sigue siendo bajo. El test McNemar nos sigue mostrando este desbalance en nuestros datos, el modelo sigue prediciendo mejor aquellos que no se van, que aquellos que si lo hacen. 
-Siguiendo esta línea, nuestro recall e de solo un 48%, lo cual sigue siendo bajo, ya que significa que predecimos mal la mitad de aquellos que se marchan. 
-La especificidad es alta, asi como el NPV, ya que predecimos bien los negativos, con cerca de un 96% de las predicciones siendo correctas. 
-Por último. comparando AUC y sensitividad podemos extraer que el threshold de 0.5 para la AUC no es el ideal en nuestro caso, ya que si eligieramos otro threshold, tendríamos una sensitividad más alta a expensas de tener una especificidad y precisión más bajas, algo que nos podría llegar a interesar puesto que nuestro objetivo es que los clientes no se vayan del bank_data.
+
+Podemos ver como este modelo tiene una accuracy de un 86% lo cual es
+bastante bueno, aunque debemos indagar más en el resto de métricas para
+ver si realmente nuestras predicciones son buenas. El índice Kappa es
+mejor que en otros modelos, cerca del 50%, aunque sigue siendo bajo. El
+test McNemar nos sigue mostrando este desbalance en nuestros datos, el
+modelo sigue prediciendo mejor aquellos que no se van, que aquellos que
+si lo hacen. Siguiendo esta línea, nuestro recall e de solo un 48%, lo
+cual sigue siendo bajo, ya que significa que predecimos mal la mitad de
+aquellos que se marchan. La especificidad es alta, asi como el NPV, ya
+que predecimos bien los negativos, con cerca de un 96% de las
+predicciones siendo correctas. Por último. comparando AUC y sensitividad
+podemos extraer que el threshold de 0.5 para la AUC no es el ideal en
+nuestro caso, ya que si eligieramos otro threshold, tendríamos una
+sensitividad más alta a expensas de tener una especificidad y precisión
+más bajas, algo que nos podría llegar a interesar puesto que nuestro
+objetivo es que los clientes no se vayan del bank_data.
 
 A continuación lo aplicamos en los datos de test
+
 ```{r adaboost test}
 prediction <- predict(model_adaboost, newdata = test_data)
 
@@ -718,9 +812,13 @@ plot(roc_curve_adaboost_test,
          legacy.axes = TRUE
          )
 ```
-Vemos como todo lo dicho anteriormente para los datos de entrenamiento aplica de nuevo a nuestros datos de test, por lo que no tenemos sobreajuste.
 
-Vamos a ver qué ocurre cuando aplicamos otros algoritmos de boosting como Gradient Boosting: 
+Vemos como todo lo dicho anteriormente para los datos de entrenamiento
+aplica de nuevo a nuestros datos de test, por lo que no tenemos
+sobreajuste.
+
+Vamos a ver qué ocurre cuando aplicamos otros algoritmos de boosting
+como Gradient Boosting:
 
 ### Gradient boosting
 
@@ -801,9 +899,17 @@ plot(roc_curve_gbm_train,
          legacy.axes = TRUE
          )
 ```
-En este caso, nuestra sensitivity aumenta ligeramente, igual que lo hace la accuracy. Estos aumentos no son significativos por lo que podemos decir que el modelo predice de igual manera que el anterior. Sin embargo, lo que si ganamos significativamente es tiempo. El modelo Adaboost es mucho más lento que el modelo GBM, por lo que, al hacer ambos predicciones similares, sería más eficiente elegir el gradient boosting para nuestro problema. 
 
-Vamos a ver qué ocurre en los datos de test, aunque obviamente esperamos un resultado similar
+En este caso, nuestra sensitivity aumenta ligeramente, igual que lo hace
+la accuracy. Estos aumentos no son significativos por lo que podemos
+decir que el modelo predice de igual manera que el anterior. Sin
+embargo, lo que si ganamos significativamente es tiempo. El modelo
+Adaboost es mucho más lento que el modelo GBM, por lo que, al hacer
+ambos predicciones similares, sería más eficiente elegir el gradient
+boosting para nuestro problema.
+
+Vamos a ver qué ocurre en los datos de test, aunque obviamente esperamos
+un resultado similar
 
 ```{r gbm test}
 prediction <- predict(model_gbm, newdata = test_data)
@@ -840,9 +946,13 @@ plot(roc_curve_gbm_test,
          legacy.axes = TRUE
          )
 ```
-Como imaginabamos, los resultados son muy similares al train, por lo que no hay sobreajuste
 
-Por último vamos a implementar el modelo XGBoost o extreme gradient boosting, el cual nos debería dar mejor resultado, no solo prediciendo, sino también en eficiencia.
+Como imaginabamos, los resultados son muy similares al train, por lo que
+no hay sobreajuste
+
+Por último vamos a implementar el modelo XGBoost o extreme gradient
+boosting, el cual nos debería dar mejor resultado, no solo prediciendo,
+sino también en eficiencia.
 
 ### XGBoost
 
@@ -890,6 +1000,7 @@ plot(xgb_importancia)
 ```
 
 Vamos a ver cómo funciona el modelo en nuestros datos de entrenamiento
+
 ```{r}
 prediction <- predict(model_xgboost, newdata = train_data)
 
@@ -925,12 +1036,27 @@ plot(roc_curve_xgboost_train,
          legacy.axes = TRUE
          )
 ```
-Tenemos un área bajo la curva (AUC) muy buena, por lo que el modelo diferencia muy bien entre positivos y negativos. En cuanto a las medidas de la matriz de confusión, en este modelo hemos perdido accuracy (sobre un 4%) pero ahora predecimos mucho mejor los TP y FN, nuestra recall es mucho mejor, pasando de un 50% aprox en otros modelos a un 76% en este, con lo que vemos que este modelo es mucho mejor prediciendo a los clientes que se van del bank_data. 
-Como conseguimos mucha mejor recall, nuestra especificidad baja significativamente a un 83%, lo cual todavía es bastante bueno, pero predecimos peor a los que no se marchan. Todo esto nos lleva a una tasa mayor de falsos positivos, ya que ahora predecimos más casos de churn. A pesar de ello, mejoramos el NPV con lo que cuando predecimos un no, es más probable que sea cierto. 
 
-En este caso, este modelo es mucho mejor si damos mayor importancia a identificar a aquellos que se quieren marchar sobre identificar a aquellos que se quedan
+Tenemos un área bajo la curva (AUC) muy buena, por lo que el modelo
+diferencia muy bien entre positivos y negativos. En cuanto a las medidas
+de la matriz de confusión, en este modelo hemos perdido accuracy (sobre
+un 4%) pero ahora predecimos mucho mejor los TP y FN, nuestra recall es
+mucho mejor, pasando de un 50% aprox en otros modelos a un 76% en este,
+con lo que vemos que este modelo es mucho mejor prediciendo a los
+clientes que se van del bank_data. Como conseguimos mucha mejor recall,
+nuestra especificidad baja significativamente a un 83%, lo cual todavía
+es bastante bueno, pero predecimos peor a los que no se marchan. Todo
+esto nos lleva a una tasa mayor de falsos positivos, ya que ahora
+predecimos más casos de churn. A pesar de ello, mejoramos el NPV con lo
+que cuando predecimos un no, es más probable que sea cierto.
 
-Vamos a ver si estos resultados se transfieren a nuestros datos de test o si hay overfitting
+En este caso, este modelo es mucho mejor si damos mayor importancia a
+identificar a aquellos que se quieren marchar sobre identificar a
+aquellos que se quedan
+
+Vamos a ver si estos resultados se transfieren a nuestros datos de test
+o si hay overfitting
+
 ```{r}
 set.seed(123)
 prediction <- predict(model_xgboost, newdata = test_data)
@@ -967,11 +1093,18 @@ plot(roc_curve_xgboost_test,
          legacy.axes = TRUE
          )
 ```
-Como podemos ver, los resultados son muy similares en test por lo que no tenemos overfitting y nuestro modelo es robusto. 
 
-Dependiendo de lo que prioricemos, si el elegir mejor a aquellos clientes que permanecen el banco o a aquellos que se van a marchar, deberemos elegir un modelo u otro. Esto lo estudiaremos un poco más adelante cuando comparemos los modelos y elijamos un modelo final para nuesto problema.
+Como podemos ver, los resultados son muy similares en test por lo que no
+tenemos overfitting y nuestro modelo es robusto.
+
+Dependiendo de lo que prioricemos, si el elegir mejor a aquellos
+clientes que permanecen el banco o a aquellos que se van a marchar,
+deberemos elegir un modelo u otro. Esto lo estudiaremos un poco más
+adelante cuando comparemos los modelos y elijamos un modelo final para
+nuesto problema.
 
 # 9. Naïve bayes
+
 ## Naive Bayes
 
 Este algoritmo está basado en el conocido teorema de Bayes, que a pesar
@@ -1130,32 +1263,23 @@ modelo manual o el modelo hecho con el paquete.
 **Justificación basada en métricas**
 
 | Métrica clave | Mejor modelo | Explicación breve |
-|-----------------|-----------------|--------------------------------------|
+|------------------|------------------|------------------------------------|
 | **Sensibilidad (Recall)** | **Naive Bayes Manual** | 33.6% vs. 26.5%. Detecta más clientes que realmente abandonan. |
 | **Balanced Accuracy** | **Naive Bayes Manual** | 64.5% vs. 62.2%. Mide rendimiento considerando el desbalance de clases. |
 | **Kappa** | **Naive Bayes Manual** | 0.355 vs. 0.324. Muestra mayor concordancia entre predicción y realidad. |
 | **Precisión (PPV)** | **Naive Bayes Paquete** | 77.1% vs. 65.6%. Mayor proporción de aciertos entre los que predice como “sí”. |
 | **Especificidad** | **Naive Bayes Paquete** | 98.0% vs. 95.5%. Menos falsos positivos, es más conservador con la clase negativa. |
 
-
 # 10. Evaluación y Comparación de Modelos
 
 Evaluamos todos los modelos en el conjunto de prueba.
 
-
 ## Cálculo de Métricas y Tabla Comparativa
-
 
 # 11. Conclusiones y Trabajo Futuro
 
 ## Elección del Modelo Final
 
-
 ## Análisis del Modelo Seleccionado
 
-
 ## Conclusiones y trabajo futuro
-
-
-
-
