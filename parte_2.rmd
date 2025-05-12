@@ -22,7 +22,7 @@ library(caret)
 library(pROC)
 library(gbm)
 library(xgboost)
-library(adabag)
+# library(adabag)
 library(rpart)
 library(ggplot2)
 library(randomForest)
@@ -265,7 +265,7 @@ El algoritmo más conocido para **Bagging** es el que desarrollaremos
 ahora que es denominado **"Random Forest"** que básicamante combina
 multiples DTs para lograr un modelo predictivo altamente preciso.
 
-## Random Forest
+### Random Forest
 
 ```{r}
 library(ggplot2)
@@ -550,6 +550,51 @@ vistas antes son más importantes a la hora de predecir el abandono en
 los bank_datas, por otro lado renemos los valores de gender y country que
 permanecen en ambos gráficos con valores muy pequeños por lo que podrían
 ser variables para considerar para eliminar.
+
+## Bagging a a mano
+```{r}
+## Bagging con iris
+# Cargamos las librerías necesarias
+library(randomForest)
+library(caret)
+
+# Usamos el dataset iris
+data(iris)
+
+# Dividimos en entrenamiento (70%) y test (30%)
+set.seed(123)
+train_index <- createDataPartition(iris$Species, p = 0.7, list = FALSE)
+train <- iris[train_index, ]
+test <- iris[-train_index, ]
+
+# Entrenamos el modelo de Bagging
+bagging_model <- randomForest(
+  Species ~ ., 
+  data = train,
+  mtry = ncol(train) - 1,  # todas menos la variable objetivo
+  importance = TRUE
+)
+
+# Realizamos predicciones
+bagging_preds <- predict(bagging_model, newdata = test)
+
+# Evaluamos el rendimiento del modelo
+conf_matrix_bagging <- confusionMatrix(
+  data = bagging_preds,
+  reference = test$Species
+)
+print(conf_matrix_bagging)
+
+# Mostramos la importancia de variables
+varImpPlot(bagging_model)
+
+```
+
+
+```{r}
+table(bagging_preds)
+```
+
 
 # 8. Boosting
 
