@@ -609,54 +609,60 @@ manualmente con nuestros datos, lo hemos implementado con el dataset -\>
 Iris.
 
 ```{r}
-library(randomForest)
+library(rpart)
 library(caret)
 
+set.seed(123)
 data(iris)
 
-# Dividimos en entrenamiento (70%) y test (30%)
-set.seed(123)
+# Dividir datos
 train_index <- createDataPartition(iris$Species, p = 0.7, list = FALSE)
 train <- iris[train_index, ]
 test <- iris[-train_index, ]
 
-bagging_model <- randomForest(
-  Species ~ ., 
-  data = train,
-  mtry = ncol(train) - 1,  # todas menos la variable objetivo
-  importance = TRUE
-)
+# Parámetros del bagging
+n_trees <- 100
+n <- nrow(train)
+predictions_matrix <- matrix(NA, nrow = nrow(test), ncol = n_trees)
 
-bagging_preds <- predict(bagging_model, newdata = test)
+# Entrenar árboles bootstrap
+for (i in 1:n_trees) {
+  sample_indices <- sample(1:n, size = n, replace = TRUE)
+  bootstrap_sample <- train[sample_indices, ]
+  
+  tree_model <- rpart(Species ~ ., data = bootstrap_sample, method = "class", control = rpart.control(cp = 0))
+  
+  # Obtener clases, no probabilidades
+  preds <- predict(tree_model, newdata = test, type = "class")
+  
+  predictions_matrix[, i] <- as.character(preds)
+}
 
-# Evaluamos el rendimiento del modelo
-conf_matrix_bagging <- confusionMatrix(
-  data = bagging_preds,
-  reference = test$Species
-)
-print(conf_matrix_bagging)
+# Voto mayoritario
+final_predictions <- apply(predictions_matrix, 1, function(row) {
+  names(sort(table(row), decreasing = TRUE))[1]
+})
 
-varImpPlot(bagging_model)
+# Convertir a factor con niveles correctos
+final_predictions <- factor(final_predictions, levels = levels(test$Species))
+
+# Evaluar
+conf_matrix_manual <- confusionMatrix(final_predictions, test$Species)
+print(conf_matrix_manual)
 
 ```
 
 | **Categoría** | **Resultado** | **Conclusión** |
-|-------------------|-------------------|------------------------------------|
+|----|----|----|
 | **Precisión global** | 0.9333 | Muy alta precisión general del modelo. |
 | **Intervalo de confianza (95%)** | (0.8173, 0.986) | Alta fiabilidad en el rendimiento estimado. |
-| **Kappa** | 0.9 | Excelente acuerdo entre predicción y realidad (más allá del azar). |
-| **Setosa - Sensibilidad** | 1.000 | El modelo identifica correctamente todos los casos de setosa. |
-| **Setosa - Especificidad** | 1.000 | No hay falsos positivos al predecir setosa. |
-| **Versicolor - Sensibilidad** | 0.9333 | La mayoría de versicolor se identifican correctamente. |
-| **Versicolor - Especificidad** | 0.9333 | Muy pocos falsos positivos para versicolor. |
-| **Virginica - Sensibilidad** | 0.8667 | Buen desempeño, aunque hay algunas confusiones. |
-| **Virginica - Especificidad** | 0.9667 | Casi sin falsos positivos al predecir virginica. |
-| **Variable más importante (Accuracy)** | Petal.Width | Es la que más influye en la precisión del modelo. |
-| **Variable más importante (Gini)** | Petal.Width | Es la que más reduce la impureza en los árboles. |
-| **Variables con menor importancia** | Sepal.Width, Sepal.Length | Aportan poco al modelo, se podrían eliminar sin gran pérdida. |
-| **Clase más fácilmente identificable** | Setosa | Totalmente separable por el modelo. |
-| **Mayor confusión entre clases** | Versicolor y Virginica | Son las más parecidas, el modelo tiende a confundirlas. |
-| **Conclusión general** | Modelo preciso, balanceado y estable | Excelente rendimiento general, buena interpretación y separación de clases. |
+| **Kappa** | 0.9 | Fuerte acuerdo entre predicción y valores reales más allá del azar. |
+| **Clase mejor clasificada** | Setosa (100%) | Se clasifica perfectamente, sin errores. |
+| **Clases con más errores** | Versicolor y Virginica | Confusión ocasional entre estas dos clases, como es común en este dataset. |
+| **Sensibilidad promedio** | 0.9333 | Alta capacidad de detectar correctamente los casos positivos en cada clase. |
+| **Especificidad promedio** | ≈ 0.9667 | Alta capacidad de evitar falsos positivos. |
+| **Facilidad de implementación** | Media | Requiere más pasos que `randomForest`, pero permite comprensión detallada. |
+| **Visualización de importancia** | No disponible directa | Se necesitaría implementar manualmente si se desea analizar importancia. |
 
 ```{r}
 table(bagging_preds)
@@ -1138,7 +1144,7 @@ print(cf_nb)
 **Resultados de la matriz de confusión - Naive Bayes**
 
 | Métrica | Valor | Interpretación |
-|-------------------|-------------------|----------------------------------|
+|----|----|----|
 | **Accuracy** | 83.41% | Precisión global aceptable. |
 | **Sensitivity (Recall clase 1)** | 26.47% | Muy baja: detecta pocos clientes que hacen churn. |
 | **Specificity** | 97.99% | Muy alta: predice muy bien los que **no** hacen churn. |
@@ -1211,7 +1217,7 @@ A partir de esta respueta podemos sacar las siguientes conclusiones.
 **Conclusiones del Modelo Naive Bayes**
 
 | Métrica | Valor | Conclusión |
-|-------------------|-------------------|----------------------------------|
+|----|----|----|
 | **Accuracy** | 92.16% | Excelente precisión general del modelo. |
 | **Kappa** | 0.7358 | Alta concordancia respecto a la clasificación aleatoria. |
 | **Sensibilidad (Recall)** | 69.23% | Detecta 7 de cada 10 clientes que realmente se van. |
@@ -1263,7 +1269,7 @@ modelo manual o el modelo hecho con el paquete.
 **Justificación basada en métricas**
 
 | Métrica clave | Mejor modelo | Explicación breve |
-|------------------|------------------|------------------------------------|
+|----|----|----|
 | **Sensibilidad (Recall)** | **Naive Bayes Manual** | 33.6% vs. 26.5%. Detecta más clientes que realmente abandonan. |
 | **Balanced Accuracy** | **Naive Bayes Manual** | 64.5% vs. 62.2%. Mide rendimiento considerando el desbalance de clases. |
 | **Kappa** | **Naive Bayes Manual** | 0.355 vs. 0.324. Muestra mayor concordancia entre predicción y realidad. |
