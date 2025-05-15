@@ -52,9 +52,13 @@ library(randomForest)
 Cargamos los datos y hacemos la division train-test
 
 ```{r cargar datos}
+
 # Cargar datos
 bank_data <- read.csv('Bank Customer Churn Prediction.csv')
 head(bank_data)
+
+# Verificar estructura de los datos
+str(bank_data)
 ```
 
 ```{r split train-test}
@@ -69,6 +73,267 @@ cat("Dimensiones - Test Data:", dim(test_data), "\n")
 
 # 3. Regresión logística
 
+
+Estudiamos la influencia de active_member en churn
+```{r}
+tabla1 <- table(train_data$active_member, train_data$churn)
+tabla1
+```
+
+```{r}
+chisq.test(tabla1)
+```
+Podemos ver que existe una relación relevante entre ambas variables ya que es p-valor es claramente menor a 0.05. 
+
+Usamos la regresión logística para cuantificar la relación:
+```{r}
+# Modelo con active_member
+logit1 <- glm(churn ~ active_member, 
+              data = train_data, 
+              family = binomial(link = "logit"))
+
+summary(logit1)
+
+# Odds Ratios
+exp(cbind(OR = coef(logit1), confint.default(logit1)))
+```
+Como vemos la variable active_members tiene alta significatividad en la variable respuesta churn. La estimación es negativa, lo que indica que ser miembro activo disminuye la probabilidad de churn(irse del bank_data).
+
+Como el OR de active_member es menor que 1, es un factor protector contra el churn. Ser miembro activo del bank_data reduce de forma significativa la probabilidad de que un cliente se dé de baja del bank_data. La odds ratioo de 0.43... indica que las probabilidades de churn se reducen casi a la mitad cuando el cliente es activo.
+
+```{r}
+confint.default(logit1)
+```
+
+
+Ahora vamos a hacer un modelo con cada variable con la variable objetivo churn para ver como se comportan.
+```{r}
+# Convertir variables categóricas
+convertir_variables <- function(data) {
+  data %>%
+    mutate(
+      active_member = factor(active_member, levels = c(0, 1)),
+      credit_card = factor(credit_card, levels = c(0, 1)),
+      country = factor(country),
+      gender = factor(gender)
+    )
+}
+
+train_data <- convertir_variables(train_data)
+test_data <- convertir_variables(test_data)
+
+# Lista de variables predictoras
+variables <- c("age", "tenure", "credit_score", "country", 
+               "gender", "balance", "products_number", 
+               "credit_card", "active_member", "estimated_salary")
+
+# Análisis univariante
+resultados_univariante <- list()
+
+for (var in variables) {
+  formula <- as.formula(paste("churn ~", var))
+  modelo <- glm(formula, data = train_data, family = binomial)
+  
+  # Almacenar resultados
+  resultados_univariante[[var]] <- list(
+    summary = summary(modelo),
+    OR = exp(cbind(OR = coef(modelo), confint.default(modelo))))
+}
+
+# Mostrar resultado
+for (var in variables) {
+  cat("\nVariable:", var, "\n")
+  print(resultados_univariante[[var]]$summary)
+  cat("\nOdds Ratio e IC 95%:\n")
+  print(resultados_univariante[[var]]$OR)
+}
+
+```
+Interpretación de resultados:
+  
+  Variable: age
+p-value < 2e-16 → altamente significativa
+OR = 1.072 → Por cada año adicional, las odds de abandono (churn) aumentan un 7.2%
+Significativa
+
+Variable: tenure
+p-value = 0.126 → no significativa
+OR = 0.98 → ligera disminución del riesgo con más años, pero no concluyente
+No significativa
+
+Variable: credit_score
+p-value = 0.417 → no significativa
+OR ≈ 1 → efecto mínimo/neutro
+No significativa
+
+Variable: country
+countryGermany: p-value < 2e-16, OR = 2.49 → los clientes alemanes tienen 149% más odds de churn que los de referencia
+countrySpain: p-value = 0.246, OR = 1.11 → no significativa
+Solo countryGermany es significativa
+
+Variable: gender
+p-value < 2e-16, OR = 0.577 → ser hombre reduce las odds de churn en un 42.3%
+Significativa
+
+Variable: balance
+p-value < 2e-16, OR muy cercana a 1 pero significativa → valores altos de balance se asocian positivamente con churn
+Significativa
+
+Variable: products_number
+p-value = 0.006, OR = 0.846 → cada producto extra reduce las odds de churn en un 15.4%
+Significativa
+
+Variable: credit_card
+p-value = 0.206, OR = 0.91 → no significativa
+No significativa
+
+Variable: active_member
+p-value < 2e-16, OR = 0.47 → ser miembro activo reduce las odds de churn un 53%
+Significativa
+
+Variable: estimated_salary
+p-value = 0.493, OR ≈ 1 → sin efecto aparente
+No significativa
+
+Conclusión general:
+  Variables significativas individualmente:
+  
+  age
+
+countryGermany
+
+gender
+
+balance
+
+products_number
+
+active_member
+
+Variables no significativas:
+  
+  tenure
+
+credit_score
+
+countrySpain
+
+credit_card
+
+estimated_salary
+
+A continuación. ajustamos un modelo de regresión logística con todas las carecterísticas significativas.
+```{r}
+modelo_completo <- glm(churn ~ age + country + gender + balance + products_number + active_member, data = train_data, family = "binomial")
+summary(modelo_completo)
+```
+
+En un modelo con todas las variables deja de ser significante la variable de countrySpain al producirse la interacción con las demás variables
+
+
+```{r}
+table(train_data$factor.churn)
+```
+Esto nos indica que el modelo está sesgado hacia la clase "no".
+
+
+Calculamos la probabilidad que ofrece el modelo para cada una de las observaciones en la muestra de entrenamiento
+```{r}
+# Predicciones
+predicciones <- predict(modelo_completo, type = "response")
+
+# Histograma de probabilidades
+hist(predicciones, main = "Distribución de probabilidades predichas",
+     xlab = "Probabilidad de Churn", ylab = "Frecuencia")
+```
+En este histograma que hemos creado sobre la distribución de las probabilidades predichas por el modelo de regresión logística que hemos creado con las variables binomiales significantes que hemos creado, vemos que la mayoría de las predicciones están entre 0.1 y 0.2, lo que significa que la mauoría de los clientes tienen baja probabilidad de irse. Además no hay clientes con altas probabilidades de irse.
+
+```{r}
+library(caret)
+
+# Asegurar que ambos factores tengan los mismos niveles
+clase_pred <- factor(ifelse(predicciones > 0.5, 1, 0), 
+                    levels = c(0, 1))
+
+# Convertir train_data$churn a factor con los mismos niveles (si no lo está)
+train_data$churn <- factor(train_data$churn, levels = c(0, 1))
+test_data$churn <- factor(test_data$churn, levels = c(0, 1))
+
+# Verificar niveles
+levels(clase_pred)
+levels(train_data$churn)
+
+# Ahora ejecutar la matriz de confusión
+conf_matrix <- confusionMatrix(clase_pred, train_data$churn, positive = "1")
+print(conf_matrix)
+```
+ Análisis de matriz de confusión CORREGIDO
+Esta matriz de confusión muestra:
+- Verdaderos Negativos (VN): 6161 (predicción correcta de "no churn")
+- Falsos Positivos (FP): 220 (predicción incorrecta de "churn")
+- Falsos Negativos (FN): 1285 (casos de churn no detectados)
+- Verdaderos Positivos (VP): 334 (churn correctamente identificados)
+
+El modelo tiene un accuracy del 81.2%, pero presenta un grave problema de sensibilidad: 
+- Solo detecta el 20.6% de los casos reales de churn (335 falsos negativos)
+- Aunque identifica correctamente el 96.5% de los "no churn" (alta especificidad)
+
+Esto indica que el modelo es demasiado conservador, priorizando evitar falsas alarmas (FP) a costa de perder muchos casos reales (FN).
+
+
+```{r}
+# Cálculo de métricas CORREGIDO
+confmat1 <- confusionMatrix(
+  data = factor(clase_pred, levels = c("0", "1")),  # Asegurar niveles consistentes
+  reference = factor(train_data$churn, levels = c("0", "1")),  # Usar misma codificación
+  positive = "1"  # Clase positiva correctamente especificada
+)
+
+# Cálculo F1 Score optimizado
+Precision <- confmat1$byClass["Pos Pred Value"]
+Recall <- confmat1$byClass["Sensitivity"]
+F1score <- ifelse((Precision + Recall) == 0, 0, 
+                 2 * (Precision * Recall) / (Precision + Recall))
+
+cat("\nMétrica F1 Score:", round(F1score, 3), 
+    "\n(Valor bajo indica desbalance entre precisión y recall)\n")
+```
+El F1Score es un indicador de balance entre precisión y recall. Un 0.33 es un balance muy bajo, lo que indica que el modelo no está haciendo un gran trabajo prediciendo quién se va a dar de baja.
+
+```{r}
+# Predicciones
+predicciones_test <- predict(modelo_completo, newdata = test_data, type = "response")
+
+clase_pred_test <- factor(ifelse(predicciones_test > 0.5, 1, 0), 
+                    levels = c(0, 1))
+
+# Cálculo de métricas CORREGIDO
+confmat2 <- confusionMatrix(
+  data = factor(clase_pred_test, levels = c("0", "1")),  # Asegurar niveles consistentes
+  reference = factor(test_data$churn, levels = c("0", "1")),  # Usar misma codificación
+  positive = "1"  # Clase positiva correctamente especificada
+)
+
+print(confmat2)
+
+# Cálculo F1 Score optimizado
+Precision <- confmat2$byClass["Pos Pred Value"]
+Recall <- confmat2$byClass["Sensitivity"]
+F1score <- ifelse((Precision + Recall) == 0, 0, 
+                 2 * (Precision * Recall) / (Precision + Recall))
+
+cat("\nMétrica F1 Score:", round(F1score, 3), 
+    "\n(Valor bajo indica desbalance entre precisión y recall)\n")
+```
+
+
+
+Calculamos la curva ROC.
+```{r}
+library(pROC)
+
+roc_score=roc(test_data$churn, predicciones_test, plot=TRUE,print.auc=TRUE)
+```
 # 4. K-NN
 
 Vamos a aplicar ahora el algoritmo de k vecinos más cercanos (k-nn).
@@ -180,12 +445,180 @@ primera parte de la práctica, no podremos aplicarlo a nuestros datos, es
 por ello que solamente vamos a aplicarlo de manera manual con unos datos
 que cumplen las condiciones necesarias
 
+
+## Análisis discriminante lineal manual
+
+Preparación de los datos
+```{r}
+# Seleccionar solo variables numéricas para este ejemplo (excluyendo customer_id)
+variables_numericas <- c("credit_score", "age", "tenure", "balance", "products_number", "estimated_salary")
+
+X <- train_data[, variables_numericas]
+y <- factor(train_data$churn, levels = c("X0", "X1"), labels = c("no", "yes"))
+
+# Ver estructura
+str(X)
+summary(X)
+```
+
+Dividimos los datos en grupos
+```{r}
+# Datos para churn = 0 (no abandono)
+X0 <- X[y == "no", ]
+# Datos para churn = 1 (abandono)
+X1 <- X[y == "yes", ]
+
+# Número de observaciones en cada grupo
+n0 <- nrow(X0)
+n1 <- nrow(X1)
+n_total <- n0 + n1
+```
+
+Calculamos las medias de cada grupo
+```{r}
+# Medias para churn = 0
+mu0 <- colMeans(X0)
+# Medias para churn = 1
+mu1 <- colMeans(X1)
+
+# Media global
+mu_total <- colMeans(X)
+```
+
+Calculamos las matrices de covarianza
+```{r}
+# Matriz de covarianza para churn = 0
+S0 <- cov(X0)
+# Matriz de covarianza para churn = 1
+S1 <- cov(X1)
+
+# Matriz de covarianza agrupada 
+S_agrupada <- ((n0 - 1) * S0 + (n1 - 1) * S1) / (n_total - 2)
+
+# Verificación y regularización si es necesario
+if (det(S_agrupada) == 0 || any(is.na(S_agrupada))) {
+  S_agrupada <- S_agrupada + diag(1e-6, ncol(S_agrupada))
+}
+```
+
+Calculamos los coeficientes discriminantes
+```{r}
+# Invertir la matriz de covarianza agrupada
+S_agrupada_inv <- solve(S_agrupada)
+
+# Coeficientes del discriminante lineal
+coeficientes <- S_agrupada_inv %*% (mu1 - mu0)
+names(coeficientes) <- variables_numericas
+
+# Término constante
+constante <- -0.5 * t(mu1 - mu0) %*% S_agrupada_inv %*% (mu1 + mu0) + log(n1/n0)
+```
+
+Función discriminante
+```{r}
+# Función para calcular los scores discriminantes
+calcular_score <- function(x) {
+  t(coeficientes) %*% x + constante
+}
+
+# Aplicar a todos los datos
+scores <- apply(X, 1, calcular_score)
+
+summary(scores)
+sum(is.na(scores))
+```
+
+Clasificamos las observaciones basadas en los scores.
+```{r}
+# Umbral de decisión (usando probabilidades previas)
+umbral <- 0.5
+predicciones <- ifelse(scores > 0, "yes", "no")
+
+# Matriz de confusión
+matriz_confusion <- table(Predicho = predicciones, Real = y)
+print(matriz_confusion)
+
+# Precisión
+precision <- sum(diag(matriz_confusion)) / n_total
+print(paste("Precisión:", precision))
+```
+
+087 clientes que no hicieron churn fueron correctamente clasificados como "no": Verdaderos negativos.
+
+135 clientes que sí hicieron churn fueron correctamente clasificados como "yes": Verdaderos positivos.
+
+294 clientes fueron predichos como "sí" pero en realidad no abandonaron: Falsos positivos.
+
+1484 clientes que sí abandonaron fueron predichos como "no": Falsos negativos.
+
+- El modelo acierta en un 77.8% de los casos. El modelo acierta bastante bien en detectar los clientes que no van a abandonar el banco, sin embargo, falla bastante en detectar los que si abandonan, por lo que tenemos un desbalanceo de clases.
+
+
+Para visualizar, hemos reducido a 2 dimensiones usando los dos primeros coeficientes.
+```{r}
+# Proyección en el espacio discriminante
+proyeccion <- as.matrix(X) %*% coeficientes
+
+summary(proyeccion)
+
+# Crear dataframe para ggplot
+df_plot <- data.frame(
+  LD1 = proyeccion,
+  Churn = y
+)
+
+# Graficar
+library(ggplot2)
+ggplot(df_plot, aes(x = LD1, fill = Churn)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 30) +
+  labs(title = "Distribución de los scores discriminantes",
+       x = "Score discriminante (LD1)", y = "Frecuencia") +
+  theme_minimal()
+```
+
+- El eje X muestra los valores del score discriminante, es decir, el resultado de aplicar la función lineal construida a cada observación
+- El eje y la frecuencia de clientes con ese score.
+
+- Los clientes que no abandonaron están más concentrados en valores bajos del score, los que si abandonaron tienden a tener valores más altos, aunque se solapan bastante. Esto significa que el LDA no logra separar perfectamente a los clientes que se quedan de los que se van.
+- Este solapamiento explica por qué la precisión del modelo no es muy alta.
+
+Calculamos los coeficientes estandarizados para comparar la importancia de las variables.
+```{r}
+# Coeficientes estandarizados
+desviaciones <- apply(X, 2, sd)
+coeficientes <- as.numeric(coeficientes)
+names(coeficientes) <- variables_numericas
+
+coeficientes_estandarizados <- coeficientes * desviaciones
+
+
+# Ordenar por importancia
+importancia <- data.frame(
+  Variable = names(coeficientes_estandarizados),
+  Coeficiente = as.numeric(coeficientes_estandarizados),
+  Absoluto = abs(as.numeric(coeficientes_estandarizados))
+)
+
+importancia <- importancia[order(-importancia$Absoluto), ]
+print(importancia)
+```
+
+Age: 0.76: Es la variable más importante. A mayor edad, mayor probabilidad de churn.
+
+Balance: 0.29: Segunda en importancia. Clientes con más saldo tienen mayor probabilidad de churn.
+
+Credit_score: -0.08: Tiene un efecto leve, y negativo: a mayor puntuación crediticia, menor probabilidad de churn.
+
+Estimated_salary: 0.04: Efecto pequeño: los salarios más altos se asocian ligeramente con más churn.
+
+Products_number: -0.02: Casi irrelevante. Tener más productos se asocia muy débilmente con menos churn.
+
+Tenure: 0.005: No aporta prácticamente nada.
+
+
 # 6. Árboles de decisión
 
-Vamos a aplicar el método del árbol de decisión (DT) a nuestros datos,
-en el que hacemos un modelo para predecir la variable churn a partir de
-otras variables.
-
+Vamos a aplicar el método del árbol de decisión (DT) a nuestros datos, en el que hacemos un modelo para predecir la variable churn a partir de otras variables.
 ```{r}
 library(rpart)
 library(rpart.plot)
@@ -199,93 +632,160 @@ fit.dt <- rpart(churn~., data = datos_DT, method = 'class')
 rpart.plot(fit.dt, extra = 100)
 
 ```
+Reglas Clave y su Significado:
 
-El nodo raíz es la condición de age \< 41, si la condición es verdadera
-se sigue por la rama izquierda, si es falsa por la derecha. Cada nodo
-intermedio tiene su condición. Los nodos hojas contienen una predicción
-"yes" o "no" y el porcentaje de datos en ese nodo que cumplen esa clase.
-Por ejemplo, el nodo "no" del 51% predice que el cliente no se dará de
-baja y el 51% de los casos están ahí.
+    -products_number < 3 (Aparece 3 veces)
 
-ANÁLISIS DEL ÁRBOL DE DECISIÓN: PREDICCIÓN DE CHURN
+        Indica que el número de productos contratados es el factor más determinante.
 
-```         
-Raíz del árbol
-Condición: age < 41
+        Clientes con menos de 3 productos son más propensos a abandonar (probablemente por menor engagement).
 
-Si la edad es menor a 41: rama izquierda
+    -active_member = +
 
-Si la edad es 41 o más: rama derecha
+        Clientes activos (ej: que usan servicios frecuentemente) tienen menor riesgo de churn.
 
-Distribución:
-53% de los casos van hacia 'no churn'
+        El símbolo + sugiere que esta condición reduce la probabilidad de abandono.
 
-47% hacia 'sí churn'
+    -products_number >= 2
 
-Rama izquierda (age < 41)
-Condición: products_number < 2.6
+        Clientes con 2 o más productos tienen menor riesgo.
 
-Si products_number < 2.6:
-Resultado: 51% no churn, 3% sí churn
-Interpretación: Clientes jóvenes con pocos productos tienden a quedarse.
+        Corrobora que la retención mejora con más productos contratados.
 
-Si products_number ≥ 2.6:
-Se analiza: balance < 63000
+    -country = France, Spain
 
-    Si balance < 63000:
-    Resultado: 6% no churn, 3% sí churn
-    Interpretación: Jóvenes con más productos y saldo bajo siguen siendo leales.
+        Ubicación geográfica como predictor:
 
-    Si balance ≥ 63000:
-    Se analiza: age < 49
+            Francia y España podrían tener mayor churn que otros países (ej: Alemania).
 
-        Si age < 49:
-        Resultado: 3% no churn, 3% sí churn
-        Interpretación: Jóvenes con más productos y saldo alto muestran comportamiento mixto.
+            O podría ser un nodo intermedio para otras divisiones (depende del árbol completo).
 
-Rama derecha (age ≥ 41)
-Condición: products_number ≥ 1.7
+    -balance >= 70,000
 
-Si products_number ≥ 1.7:
-Resultado: 29% sí churn
-Interpretación: Clientes mayores con muchos productos tienden a abandonar el servicio.
+        Clientes con saldos altos (≥70k) tienen comportamiento distinto.
 
-Si products_number < 1.7:
-Se analiza: products_number < 2.4
+        Posiblemente:
 
-    Si products_number < 2.4:
-    Resultado: 5% sí churn
+            Mayor balance → Menor churn (por relación más valiosa).
 
-    Si products_number ≥ 2.4:
-    Resultado: 6% sí churn
-    Interpretación: Clientes mayores con menos productos tienen menor probabilidad de churn.
-    
-```
+            O podría asociarse a otros factores (ej: productos adicionales).
+
+Interpretación del Modelo:
+
+    -Variables más importantes:
+
+        products_number (principal), active_member, country, balance.
+
+    -Perfil de alto riesgo:
+
+        Clientes con <3 productos, inactivos, y de Francia/España.
+
+    -Perfil de bajo riesgo:
+
+        Clientes con ≥2 productos, activos, y saldos altos.
+        
 
 Usamos el modelo DT para realizar predicciones:
-
 ```{r}
+# Sobre la partición de entrenamiento
 prediccion_DT <- predict(fit.dt, train_data, type = 'class')
-cf_DT <- confusionMatrix(prediccion_DT, as.factor(datos_DT$churn), positive = "yes")
+cf_DT <- confusionMatrix(prediccion_DT, as.factor(datos_DT$churn), positive = "X1")
 
 print(cf_DT)
 ```
+Métricas Principales:
 
-Un rendimiento del 73.83%.
+    Precisión (Accuracy): 86.2%
+
+        El modelo acierta en el 86.2% de los casos.
+
+        Intervalo de confianza (95%): 85.4% - 86.9%
+
+    Sensibilidad: 40.8%
+
+        Detecta solo el 40.8% de los casos reales de abandono (churn).
+
+        Problema grave: Pierde el 59.2% de los clientes que realmente se van.
+
+    Especificidad: 97.7%
+
+        Identifica correctamente el 97.7% de los clientes que no abandonan.
+
+    (PPV): 81.8%
+
+        Cuando predice abandono, acierta en el 81.8% de los casos.
+
+    Kappa: 0.47
+
+        Acuerdo moderado entre predicciones y realidad.
+
+Interpretación:
+
+    El modelo es bueno evitando falsas alarmas (solo 147 FP)
+
+    Pero falla en detectar abandonos reales (959 FN no detectados)
+
+    Desequilibrio importante: Hay 6.5 veces más FN que FP (959 vs 147)
 
 Vamos a implementarlo en el df de test
-
 ```{r}
 # Sobre la partición de prueba
 prediction.dt <- predict(fit.dt, test_data, type = 'prob')[,2]
-clase.pred=ifelse(prediction.dt>0.5,"yes","no")
+clase.pred=ifelse(prediction.dt>0.5,"X1","X0")
 
-cf_DT_prueba <- confusionMatrix(as.factor(clase.pred), as.factor(test_data$churn),positive="yes")
+cf_DT_prueba <- confusionMatrix(as.factor(clase.pred), as.factor(test_data$churn),positive="X1")
 
 print(cf_DT_prueba)
 ```
+Métricas clave:
 
-Un rendimiento casi igual que el de entrenamiento del 73.27%
+    - Precisión (Accuracy): 85.0%
+
+        El modelo acierta en el 85% de las predicciones
+
+        Intervalo de confianza 95%: (83.36%, 86.54%)
+
+    - Sensibilidad/Recall: 38.76%
+
+        Detecta solo el 38.76% de los casos reales de churn
+
+        Problema principal: No detecta el 61.24% de los abandonos reales (256 FN)
+
+    - Especificidad: 97.22%
+
+        Identifica correctamente el 97.22% de los no abandonos
+
+        Solo 44 falsas alarmas (FP)
+
+    (PPV): 78.64%
+
+        Cuando predice abandono, acierta en el 78.64% de los casos
+
+    - Kappa: 0.4423
+
+        Acuerdo moderado entre predicciones y realidad
+
+Interpretación detallada:
+
+    - Balance de clases:
+
+        Prevalencia de churn: 20.9% (ligeramente desbalanceado)
+
+        El modelo predice churn en el 10.3% de los casos (Detection Prevalence)
+
+    - Rendimiento en detección de churn:
+
+        Solo detecta 162 de 418 casos reales (162 VP de 418 = 38.76%)
+
+        256 falsos negativos (clientes que abandonaron pero no fueron detectados)
+
+    - Comparación con modelo aleatorio:
+
+        P-value < 2.2e-16 indica que el modelo es significativamente mejor que adivinar al azar
+
+        Pero la mejora es insuficiente para la detección de churn
+
+
 
 # 7. Bagging
 
