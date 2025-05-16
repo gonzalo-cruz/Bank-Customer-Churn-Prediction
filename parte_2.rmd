@@ -1165,7 +1165,7 @@ print(conf_matrix_manual)
 | **Visualización de importancia** | No disponible directa | Se necesitaría implementar manualmente si se desea analizar importancia. |
 
 ```{r}
-table(bagging_preds)
+table(final_predictions)
 ```
 
 # 8. Boosting
