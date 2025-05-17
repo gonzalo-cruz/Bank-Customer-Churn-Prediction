@@ -1,13 +1,200 @@
 ---
-title: "modelos_manuales"
-author: "Gonzalo Cruz Gómez"
-date: "2025-05-08"
-output: html_document
+title: "Modelos_manuales"
+author: "Grupo 6: Gonzalo Cruz Gómez, Samuel Martínez Lorente, Jorge Tordesillas García"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    theme: flatly
 ---
+# Indice
+
+-   ADL (Jorge)
+-   K-NN (Gonzalo)
+-   Bagging (Samuel)
+-   AdaBoost (Gonzalo)
+-   Naive Bayes (Samuel)
+
 
 Vamos a implementar los diferentes modelos pedidos a mano desde cero para después compararlos con sus contrapartes ya implementadas en R 
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, fig.align = 'center')
+
+# Cargamos las librerías 
+library(tidyverse)
+library(data.table)
+library(knitr)
+library(caret)
+library(pROC)
+library(gbm)
+library(xgboost)
+library(adabag)
+library(rpart)
+library(ggplot2)
+library(naivebayes)
+library(randomForest)
+library(mlbench)
+bank_data <- read.csv('Bank Customer Churn Prediction.csv')
+head(bank_data)
+set.seed(42)
+train_index <- createDataPartition(bank_data$churn, p = 0.8, list = FALSE, times = 1)
+train_data <- bank_data[train_index, ]
+test_data <- bank_data[-train_index, ]
+
+cat("Dimensiones - Train Data:", dim(train_data), "\n")
+cat("Dimensiones - Test Data:", dim(test_data), "\n")
+```
 # Análisis discriminante lineal
+
+Como el LDA no se puede aplicar con nuestros datos al no cumplir estos las propiedades necesarias, utilizaremos un dataset que si que las cumpla, en este caso el dataset iris de R
+
+Preparación de los datos
+```{r}
+# Cargar datos
+# Dataset iris
+data(iris)
+
+# Variables predictoras
+X <- iris[, 1:4]
+
+# Variable respuesta (factor con tres niveles)
+y <- iris$Species
+
+# Ver estructura
+str(X)
+summary(X)
+
+```
+
+```{r}
+X1 <- X[y == "setosa", ]
+X2 <- X[y == "versicolor", ]
+X3 <- X[y == "virginica", ]
+
+n1 <- nrow(X1)
+n2 <- nrow(X2)
+n3 <- nrow(X3)
+n_total <- n1 + n2 + n3
+
+```
+
+```{r}
+mu1 <- colMeans(X1)
+mu2 <- colMeans(X2)
+mu3 <- colMeans(X3)
+
+mu_total <- colMeans(X)
+
+```
+
+```{r}
+S1 <- cov(X1)
+S2 <- cov(X2)
+S3 <- cov(X3)
+
+# Matriz de covarianza agrupada (ponderada por tamaños)
+S_pooled <- ((n1 - 1) * S1 + (n2 - 1) * S2 + (n3 - 1) * S3) / (n_total - 3)
+
+# Regularizar si es necesario
+if (det(S_pooled) == 0 || any(is.na(S_pooled))) {
+  S_pooled <- S_pooled + diag(1e-6, ncol(S_pooled))
+}
+
+
+```
+
+
+```{r}
+# Invertir matriz de covarianza agrupada
+S_inv <- solve(S_pooled)
+
+# Calcular direcciones discriminantes (usaremos eigenvectores de entre-grupos)
+# Paso intermedio: matriz de dispersión entre grupos (B)
+B <- (n1 * (mu1 - mu_total) %*% t(mu1 - mu_total)) +
+     (n2 * (mu2 - mu_total) %*% t(mu2 - mu_total)) +
+     (n3 * (mu3 - mu_total) %*% t(mu3 - mu_total))
+
+
+# Resolver el problema generalizado de autovalores para LDA:
+eig <- eigen(solve(S_pooled) %*% B)
+
+LD_directions <- Re(eig$vectors[, 1:2])  # Parte real de los vectores discriminantes
+
+X_mat <- as.matrix(X)
+LD_scores <- Re(X_mat %*% LD_directions) # Proyecciones reales
+
+df_plot <- data.frame(LD1 = LD_scores[, 1],
+                      LD2 = LD_scores[, 2],
+                      Species = y)
+
+
+```
+
+Hacemos la representacion de la proyeccion LDA
+```{r}
+library(ggplot2)
+
+ggplot(df_plot, aes(x = LD1, y = LD2, color = Species)) +
+  geom_point(size = 2) +
+  labs(title = "Proyección LDA manual sobre iris",
+       x = "LD1", y = "LD2") +
+  theme_minimal()
+
+```
+
+```{r}
+# Proyección de las medias
+mu1_proj <- as.numeric(mu1 %*% LD_directions)
+mu2_proj <- as.numeric(mu2 %*% LD_directions)
+mu3_proj <- as.numeric(mu3 %*% LD_directions)
+
+# Clasificador: distancia euclídea en el plano discriminante
+clasificar <- function(x) {
+  x_proj <- as.numeric(x %*% LD_directions)
+  d1 <- sum((x_proj - mu1_proj)^2)
+  d2 <- sum((x_proj - mu2_proj)^2)
+  d3 <- sum((x_proj - mu3_proj)^2)
+  which.min(c(d1, d2, d3))
+}
+
+# Clasificar todas las observaciones
+pred_clases <- apply(X, 1, clasificar)
+levels(y)  # [1] "setosa"     "versicolor" "virginica"
+pred_y <- factor(pred_clases, levels = 1:3, labels = levels(y))
+
+# Matriz de confusión
+matriz <- table(Predicho = pred_y, Real = y)
+print(matriz)
+
+# Precisión
+precision <- sum(diag(matriz)) / sum(matriz)
+cat("Precisión:", round(precision * 100, 1), "%\n")
+
+```
+
+Clase setosa:
+
+  Se clasificaron correctamente los 50 ejemplares (100% acierto).
+
+  No hubo errores de clasificación para esta clase.
+
+Clase versicolor:
+
+  48 fueron correctamente clasificados.
+
+  1 ejemplar fue clasificado erróneamente como virginica.
+
+Clase virginica:
+
+  49 fueron correctamente clasificados.
+
+  2 ejemplares fueron clasificados erróneamente como versicolor.
+  
+La precisión total del modelo es del 98%, lo que indica un desempeño excelente.
+
+Solo hubo 3 errores en total (1 versicolor mal clasificado + 2 virginica mal clasificados) sobre 150 observaciones.
 
 # K-NN
 
@@ -93,13 +280,73 @@ cat("Accuracy R:", accuracy_r_iris, "\n")
 ```
 Predicen igualmente bien ambos modelos, esto es por la simplicidad del modelo k-nn
 
+
 # Bagging
 
+Vamos a implementarlo con el dataset iris de R 
+
 ```{r}
+library(rpart)
+library(caret)
+
+set.seed(123)
+data(iris)
+
+# Dividir datos
+train_index <- createDataPartition(iris$Species, p = 0.7, list = FALSE)
+train <- iris[train_index, ]
+test <- iris[-train_index, ]
+
+# Parámetros del bagging
+n_trees <- 100
+n <- nrow(train)
+predictions_matrix <- matrix(NA, nrow = nrow(test), ncol = n_trees)
+
+# Entrenar árboles bootstrap
+for (i in 1:n_trees) {
+  sample_indices <- sample(1:n, size = n, replace = TRUE)
+  bootstrap_sample <- train[sample_indices, ]
+  
+  tree_model <- rpart(Species ~ ., data = bootstrap_sample, method = "class", control = rpart.control(cp = 0))
+  
+  # Obtener clases, no probabilidades
+  preds <- predict(tree_model, newdata = test, type = "class")
+  
+  predictions_matrix[, i] <- as.character(preds)
+}
+
+# Voto mayoritario
+final_predictions <- apply(predictions_matrix, 1, function(row) {
+  names(sort(table(row), decreasing = TRUE))[1]
+})
+
+# Convertir a factor con niveles correctos
+final_predictions <- factor(final_predictions, levels = levels(test$Species))
+
+# Evaluar
+conf_matrix_manual <- confusionMatrix(final_predictions, test$Species)
+print(conf_matrix_manual)
 
 ```
 
+| **Categoría** | **Resultado** | **Conclusión** |
+|----|----|----|
+| **Precisión global** | 0.9333 | Muy alta precisión general del modelo. |
+| **Intervalo de confianza (95%)** | (0.8173, 0.986) | Alta fiabilidad en el rendimiento estimado. |
+| **Kappa** | 0.9 | Fuerte acuerdo entre predicción y valores reales más allá del azar. |
+| **Clase mejor clasificada** | Setosa (100%) | Se clasifica perfectamente, sin errores. |
+| **Clases con más errores** | Versicolor y Virginica | Confusión ocasional entre estas dos clases, como es común en este dataset. |
+| **Sensibilidad promedio** | 0.9333 | Alta capacidad de detectar correctamente los casos positivos en cada clase. |
+| **Especificidad promedio** | ≈ 0.9667 | Alta capacidad de evitar falsos positivos. |
+| **Facilidad de implementación** | Media | Requiere más pasos que `randomForest`, pero permite comprensión detallada. |
+| **Visualización de importancia** | No disponible directa | Se necesitaría implementar manualmente si se desea analizar importancia. |
+
+```{r}
+table(final_predictions)
+```
+
 # Adaboost
+
 ```{r}
 # Cargamos las librerías
 library(rpart)
@@ -219,7 +466,7 @@ confusionMatrix_manual <- confusionMatrix(y_pred_manual, y_test_factor)
 print(confusionMatrix_manual)
 
 cat("\nMétricas para el modelo AdaBoost con R:\n")
-predictions_adaboost <- factor(predictions_adaboost, levels = levels(y_test_factor))
+predictions_adaboost <- factor(predicciones_adaboost, levels = levels(y_test_factor))
 confusionMatrix_adaboost <- confusionMatrix(predicciones_adaboost, y_test_factor)
 print(confusionMatrix_adaboost)
 
@@ -227,10 +474,32 @@ print(confusionMatrix_adaboost)
 
 Podemos ver que nuestro modelo es algo peor que el de R. Esto se debe a que no ajustamos los hiperparámetros tanto como lo hacemos cuando utilizamos la funcion del paquete adabag. Particularmente tenemos mucha perdida en especificidad, accuracy y neg pred value. También el valor de kappa es mucho menor.
 
+
 # Naive bayes
 
 ```{r}
+predictors <- c("credit_score", "age", "tenure", "balance", 
+                "products_number", "estimated_salary", "country", "gender", "active_member")
+response <- "churn"
 
+data <- bank_data %>% 
+  select(all_of(c(predictors, response))) %>% 
+  na.omit() %>%
+  mutate(
+    country = as.factor(country),
+    gender = as.factor(gender),
+    active_member = as.factor(active_member)
+  )
+
+# 2. Configuración del experimento
+set.seed(123)
+n_reps <- 50
+test_size <- 0.2
+
+# Crear conjunto de test
+test_idx <- createDataPartition(bank_data$churn, p = test_size, list = FALSE)
+test_data <- bank_data[test_idx, ]
+train_data_base <- bank_data[-test_idx, ]
 # 1. Entrenar: prior y likelihoods con Laplace smoothing
 prior <- prop.table(table(train_data_base$churn))
 
@@ -284,4 +553,55 @@ cf_manual_nb <- confusionMatrix(
 
 print(cf_manual_nb)
 ```
+
+A partir de esta respueta podemos sacar las siguientes conclusiones.
+
+**Conclusiones del Modelo Naive Bayes**
+
+| Métrica | Valor | Conclusión |
+|----|----|----|
+| **Accuracy** | 83.36% | Buena precisión general del modelo. |
+| **Sensibilidad (Recall)** | 34.55% | Detecta 3 de cada 10 clientes que realmente se van. |
+| **Especificidad** | 95.86% | Detecta correctamente casi todos los clientes que se quedan. |
+| **Balanced Accuracy** | 65% | relativamente bajo debido al desbalance de clases. |
+| **Prevalencia** | 10% | Proporción real de clientes que abandonan en el test. |
+| **p-valor McNemar** | \< 2.2e-16 | Diferencias significativas entre errores tipo I y tipo II. |
+
+> **Conclusión general**: El modelo Naive Bayes muestra buen
+> rendimiento general, especialmente en identificar clientes que se
+> quedan. Es útil para clasificación binaria con clases desbalanceadas,
+> aunque podría afinarse aún más si el objetivo es maximizar la
+> detección de fuga (mayor sensibilidad).
+
+Finalmente podemos hacer una comparación de los resultados usando la
+funcion Naive Bayes y haciendo el método de manera manual.
+
+**Comparación de Modelos Naive Bayes: Paquete vs. Manual**
+
+| Métrica                   | Naive Bayes (paquete) | Naive Bayes (manual) |
+|---------------------------|-----------------------|----------------------|
+| **Accuracy**              | 83.76%                | 83.36%               |
+| **Kappa**                 | 0.3237                | 0.3724               |
+| **Sensibilidad (Recall)** | 23.24%                | 34.55%               |
+| **Especificidad**         | 97.99%                | 95.48%               |
+| **Precisión (PPV)**       | 88.78%                | 68.11%               |
+| **Balanced Accuracy**     | 61.23%                | 65.20%               |
+| **Detección Positivos**   | 4.70%                 | 7.04%                |
+| **p-valor**               | \< 2.2e-16            | \< 2.2e-16           |
+
+-   Ambos modelos tienen una precisión general alta (\~83%)
+
+-   El modelo del paquete naivebayes es más conservador y predice mejor
+    a los que no se irán, con alta especificidad (97.9%).
+
+-   El modelo implementado manualmente sacrifica algo de especificidad,
+    pero logra detectar más clientes que se irán (mejor sensibilidad)
+
+-   El Kappa es ligeramente mejor en el modelo manual (0.355 vs. 0.324),
+    lo que indica mejor acuerdo global con la clase real.
+
+Viendo esto podemos decir que en general el modelo hecho de manera
+manual es mejor pero veamos en que aspectos específicamente es mejor el
+modelo manual o el modelo hecho con el paquete.
+
 
